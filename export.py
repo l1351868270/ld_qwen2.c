@@ -9,10 +9,10 @@ def write_fp32(tensor, file):
     file.write(tensor.detach().numpy().astype("float32").tobytes())
 
 def write_fp16(tensor, file):
-    file.write(tensor.detach().numpy().astype("bfloat16").tobytes())
+    file.write(tensor.detach().numpy().astype("float16").tobytes())
 
-def write_fp16(tensor, file):
-    file.write(tensor.detach().numpy().astype("bfloat16").tobytes())
+# def write_fp16(tensor, file):
+#     file.write(tensor.detach().numpy().astype("bfloat16").tobytes())
 
 
 def fp32_write_model(model, filename):

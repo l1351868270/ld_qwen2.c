@@ -60,14 +60,12 @@ def generate(model, tokenizer, tokenized_prompt, steps):
         # print(inputs_embeds.dtype)
         # print(inputs_embeds)
         hidden_states = inputs_embeds
-        for layer_idx, decoder_layer in enumerate(model.model.layers[:1]):
+        for layer_idx, decoder_layer in enumerate(model.model.layers[:]):
             residual = hidden_states
             hidden_states = decoder_layer.input_layernorm(hidden_states)
-            variance = hidden_states.pow(2).mean(-1, keepdim=True)
-            # print(variance.shape)
-            # print(variance)
-            print(hidden_states.shape)
-            print(hidden_states)
+            # print(hidden_states.shape)
+            # print(hidden_states)
+           
             query_states = decoder_layer.self_attn.q_proj(hidden_states)
             # print(query_states.shape)
             # print(query_states)
@@ -88,6 +86,8 @@ def generate(model, tokenizer, tokenized_prompt, steps):
             query_states, key_states = apply_rotary_pos_emb(query_states, key_states, cos, sin, None)
             # print(query_states.shape)
             # print(query_states)
+            # print(key_states.shape)
+            # print(key_states)
 
             attn_weights = torch.matmul(query_states, key_states.transpose(2, 3)) / math.sqrt(decoder_layer.self_attn.head_dim)
 
@@ -124,14 +124,43 @@ def generate(model, tokenizer, tokenized_prompt, steps):
             hidden_states = decoder_layer.mlp.act_fn(gate_) * up_
             # print(hidden_states.shape)
             # print(hidden_states)
-            # hidden_states = decoder_layer.mlp.down_proj(hidden_states)
-            # hidden_states = residual + hidden_states
+            hidden_states = decoder_layer.mlp.down_proj(hidden_states)
+            # print(hidden_states.shape)
+            # print(hidden_states)
+            hidden_states = residual + hidden_states
+            # print(hidden_states.shape)
+            # print(hidden_states)
 
-        # hidden_states = model.model.norm(hidden_states)
+        hidden_states = model.model.norm(hidden_states)
         # print(hidden_states.shape)
         # print(hidden_states)
+        logits = model.lm_head(hidden_states)
+        print(logits)
         pos += 1
 
+def generate1(model, tokenizer, tokenized_prompt, steps):
+    # tokenized_prompt = tokenizer.encode(prompt)
+    tokenized_prompt = torch.tensor([tokenized_prompt])
+    # print(tokenized_prompt.shape)
+    config = model.config
+    pos = 0
+    past_key_values_length = 0
+    seq_length = tokenized_prompt.shape[-1]
+    position_ids = torch.arange(
+        past_key_values_length, seq_length + past_key_values_length, dtype=torch.long, device=device
+    )
+    position_ids = position_ids.unsqueeze(0).view(-1, seq_length)
+
+    print(position_ids)
+    
+    while(pos < 1):
+        hidden_states  = model.model(tokenized_prompt[:,:1])
+        # print(hidden_states.shape)
+        # print(hidden_states)
+        logits = model.lm_head(hidden_states[0])
+        print(logits)
+
+        pos += 1
 if __name__ == "__main__":
     model = AutoModelForCausalLM.from_pretrained(
         "Qwen/Qwen1.5-0.5B-Chat",
@@ -155,4 +184,5 @@ if __name__ == "__main__":
     tokenized_prompt = model_inputs.flatten().tolist()
     seq_len = len(tokenized_prompt)
     steps = seq_len + 1
-    generate(model, tokenizer, tokenized_prompt, steps)
+    # generate(model, tokenizer, tokenized_prompt, steps)
+    generate1(model, tokenizer, tokenized_prompt, steps)

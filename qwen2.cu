@@ -1,5 +1,5 @@
 /*
-nvcc --shared -Xcompiler -fPIC -o qwen2.so -O3 qwen2.cu -lm
+nvcc --shared -Xcompiler -fPIC -o qwen2.so -O3 qwen2.cu -lm -gencode arch=compute_80,code=sm_80
 python run.py
 */
 
@@ -89,14 +89,15 @@ void malloc_run_state(RunState* s, Qwen2Config* p) {
     int seq_len = s->max_seq_len;
     int batch = s->batch;
     int hidden_size = p->hidden_size;
+    int intermediate_size = p->intermediate_size;
     int num_heads = p->num_attention_heads;
     int head_dim = p->hidden_size / num_heads;
 
     cudaMalloc((void**)&s->x, batch * hidden_size * sizeof(float));
     cudaMalloc((void**)&s->xb, batch * hidden_size * sizeof(float));
     cudaMalloc((void**)&s->xb2, batch * hidden_size * sizeof(float));
-    cudaMalloc((void**)&s->hb, batch * hidden_size * sizeof(float));
-    cudaMalloc((void**)&s->hb2, batch * hidden_size * sizeof(float));
+    cudaMalloc((void**)&s->hb, batch * intermediate_size * sizeof(float));
+    cudaMalloc((void**)&s->hb2, batch * intermediate_size * sizeof(float));
     cudaMalloc((void**)&s->q, batch * hidden_size * sizeof(float));
     cudaMalloc((void**)&s->att, s->batch * num_heads * seq_len * sizeof(float));
     cudaMalloc((void**)&s->key_cache, batch * p->num_hidden_layers * seq_len * num_heads * head_dim * sizeof(float));
@@ -250,9 +251,13 @@ void qwen2_build_from_checkpoint(Qwen2 *model, const char* checkpoint_path) {
 
     
     void *device_memory;
+    // cudaError_t err;
     cudaMalloc((void**)&device_memory, model_size);
+    // err = cudaGetLastError();
+    // printf("%s\n", cudaGetErrorName(err));
     cudaMemcpy(device_memory, host_memory, model_size, cudaMemcpyHostToDevice);
     memory_map_weights(&model->weights, &model->config, (char*)device_memory);
+    
     free(host_memory);
 }
 
@@ -356,17 +361,17 @@ void linear_forward(float* output, float* input, half *weight, half* bias, int b
         output[offset_out] += __half2float(bias[offset_bias]);
     } 
 
-    if (thread0()) {
-        printf("linear:\n");
-        for (int b = 0; b < batch; b++) {
-            printf("[");
-            for (int i = 0; i < out_features; i++) {
-                printf("%f, ", output[b * out_features + i]);
-            }
-            printf("]\n");
-        }
-        printf("]\n");
-    }
+    // if (thread0()) {
+    //     printf("linear:\n");
+    //     for (int b = 0; b < batch; b++) {
+    //         printf("[");
+    //         for (int i = 0; i < out_features; i++) {
+    //             printf("%f, ", output[b * out_features + i]);
+    //         }
+    //         printf("]\n");
+    //     }
+    //     printf("]\n");
+    // }
 }
 
 __global__ 
@@ -390,12 +395,6 @@ void rope_forward(float *q, float rope_freq_constant, int batch, int q_heads, in
         // printf("sl=%d %d=%f ", sl, hd, sin_val);
         q[offset + hd] = v0 * cos_val - v1 * sin_val;
         q[offset + head_dim / 2 + hd] = v1 * cos_val + v0 * sin_val;
-                // s->x_qkv_proj[offset + hd + head_dim / 2] = v0 * sin_val + v1 * cos_val;
-                // printf("batch=%d seq_len=%d heads=%d %d=%f %f v=%f %f cos_sin=%f %f\n", b, sl, h, hd, s->x_qkv_proj[offset + hd], s->x_qkv_proj[offset + head_dim / 2 + hd], 
-                //        v0, v1, cos_val, sin_val);
-
-                // printf("batch=%d seq_len=%d heads=%d %d=%f %f\n", b, sl, h, hd, s->x_qkv_proj[offset + hd], s->x_qkv_proj[offset + head_dim / 2 + hd]);
-                // printf("batch=%d seq_len=%d heads=%d %d=%f %f v=%f %f cos_sin=%f %f\n", b, sl, h, hd, s->x_qkv_proj[offset + hd], s->x_qkv_proj[offset + head_dim / 2 + hd], v0, v1, cos_val, sin_val);
     }
 
     // if (thread0()) {
@@ -583,15 +582,90 @@ void silu_forward(float *hb, float* hb2, int batch, int intermediate_dim) {
     val *= hb2[offset];
     hb[offset] = val;
 
-    if (thread0()) {
-        printf("silu:\n");
-        for (int b = 0; b < batch; b++) {
-            printf("[");
-            for (int i = 0; i < intermediate_dim; i++) {
-                printf("%f, ", hb[b * intermediate_dim + i]);
-            }
-            printf("]\n");
+    // if (thread0()) {
+    //     printf("silu:\n");
+    //     for (int b = 0; b < batch; b++) {
+    //         printf("[");
+    //         for (int i = 0; i < intermediate_dim; i++) {
+    //             printf("%f, ", hb[b * intermediate_dim + i]);
+    //         }
+    //         printf("]\n");
+    //     }
+    // }
+}
+
+__global__
+void logits_forward(float* output, float* input, half *weight, half* bias, int batch, int in_features, int out_features) {
+    int b = blockIdx.x;
+    int bidy = blockIdx.y;
+    int tid = threadIdx.x;
+    int kNThreads = blockDim.x;
+
+    int out = bidy * kNThreads + tid;
+    int offset_out = b * out_features + out;
+    int offset_bias = out;
+    float value = 0.0f;
+    for (int in = 0; in < in_features; in++) {
+        int offset_in = b * in_features + in;
+        int offset_weight = out * in_features + in;
+        value += input[offset_in] * __half2float(weight[offset_weight]);
+    }
+    output[offset_out] = value;
+    if (bias != NULL) {
+        output[offset_out] += __half2float(bias[offset_bias]);
+    } 
+
+    // if (thread0()) {
+    //     printf("logits: \n");
+    //     for (int b = 0; b < batch; b++) {
+    //         printf("[");
+    //         for (int i = 0; i < out_features; i++) {
+    //             printf("%f, ", output[b * out_features + i]);
+    //         }
+    //         printf("]\n");
+    //     }
+    // }
+}
+
+__global__
+void argmax_forward(int* output, float* input, int batch, int dim) {
+    int b = blockIdx.x;
+    int tid = threadIdx.x;
+    int lid = tid % 32; // lane id
+
+    int offset = b * dim;
+
+    int max_i = lid;
+    float max_val = input[offset + max_i];
+    
+    for (int i = lid; i < dim; i += WARP_THREADS) { 
+        if (input[offset + i] > max_val) {
+            max_val = input[offset + i];
+            max_i = i;
         }
+    }
+
+    __syncwarp();
+
+    #pragma unroll
+    for (int mask = 32 / 2; mask > 0; mask /= 2) {
+        int shfl_i = __shfl_xor_sync(uint32_t(-1), max_i, mask);
+        if (input[offset + shfl_i] > max_val) {
+            max_val = input[offset + shfl_i];
+            max_i = shfl_i;
+        }
+        __syncwarp();
+    }
+    
+    output[b] = max_i;
+
+    if (thread0()) {
+        printf("argmax:\n");
+        printf("[");
+        for (int b = 0; b < batch; b++) {
+            printf("%d, ", output[b]);
+        }
+        printf("]\n");
     }
 }
 
@@ -621,11 +695,16 @@ void* qwen2_forward(Context *ctx, Qwen2* qwen2, int *token, int batch, int pos) 
     int head_dim = hidden_size / num_heads;
     
     // printf("qwen2_forward pos:%d, batch:%d, hidden_size:%d \n", pos, batch, hidden_size);
+    cudaError_t err;
     
     get_content_row<<<dim3(batch, hidden_size/WARPGROUP_THREADS), WARPGROUP_THREADS>>>(x, w->embed_tokens, token, batch, hidden_size);
     
-    for(int l = 0; l < 1; l++) {
-    // for(int l = 0; l < p->num_hidden_layers; l++) {
+    // err = cudaGetLastError();
+    // printf("+++%s\n", cudaGetErrorName(err));
+
+    cudaDeviceSynchronize();
+    // for(int l = 0; l < 1; l++) {
+    for(int l = 0; l < p->num_hidden_layers; l++) {
         // attn_norm
         rmsnorm_forward<<<dim3(batch, hidden_size / WARPGROUP_THREADS), WARPGROUP_THREADS>>>(s->xb, s->x, w->input_layernorm + l*hidden_size, rms_norm_eps, batch, hidden_size);
 
@@ -671,8 +750,8 @@ void* qwen2_forward(Context *ctx, Qwen2* qwen2, int *token, int batch, int pos) 
     }
 
     rmsnorm_forward<<<dim3(batch, hidden_size / WARPGROUP_THREADS), WARPGROUP_THREADS>>>(s->x, s->x, w->norm, rms_norm_eps, batch, hidden_size);
-    cudaDeviceSynchronize();
-    // logits_forward<<<dim3(batch, p->vocab_size / kNThreads), kNThreads>>>(s->logits, s->x, w->token_embeddings, NULL, batch, model_dim, p->vocab_size);
+    
+    logits_forward<<<dim3(batch, p->vocab_size / WARPGROUP_THREADS), WARPGROUP_THREADS>>>(s->logits, s->x, w->lm_head, NULL, batch, hidden_size, p->vocab_size);
 
     return s->logits;
 }
@@ -690,7 +769,7 @@ void c_init(int batch, int max_seq_len) {
 
 // void get_mod
 int* c_qwen2_forward(int batch, int seq_len, int *data, int pos) {
-    printf("c_openelm_forward batch:%d, seq_len:%d, pos:%d\n", batch, seq_len, pos);
+    // printf("c_openelm_forward batch:%d, seq_len:%d, pos:%d\n", batch, seq_len, pos);
     RunState *s = &py_model.state;
     
     // int* prompt_tokens = data;
@@ -702,17 +781,18 @@ int* c_qwen2_forward(int batch, int seq_len, int *data, int pos) {
     
     Context ctx;
     qwen2_forward(&ctx, &py_model, s->token, batch, pos);
-    // argmax_forward<<<s->batch, WARPGROUP_THREADS>>>(s->next, s->logits, s->batch, py_model.config.vocab_size);
     // cudaDeviceSynchronize();
+    argmax_forward<<<s->batch, WARPGROUP_THREADS>>>(s->next, s->logits, s->batch, py_model.config.vocab_size);
+    cudaDeviceSynchronize();
 
-    // for (int i = 0; i < s->batch; i++) {
-    //     cudaMemcpy(s->next_cpu + i, s->next + i, sizeof(int), cudaMemcpyDeviceToHost);
-    // }
+    for (int i = 0; i < s->batch; i++) {
+        cudaMemcpy(s->next_cpu + i, s->next + i, sizeof(int), cudaMemcpyDeviceToHost);
+    }
     
-    // // printf("pos:%d ", pos);
-    // // for (int i = 0; i < s->batch; i++) {
-    // //     printf("%d ", s->next_cpu[i]);
-    // // }
-    // // printf("\n");
+    printf("pos:%d ", pos+1);
+    for (int i = 0; i < s->batch; i++) {
+        printf("%d ", s->next_cpu[i]);
+    }
+    printf("\n");
     return s->next_cpu;
 }

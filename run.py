@@ -49,7 +49,7 @@ if __name__ == '__main__':
 
     output = []
     begin = time.time()
-    while (pos < 1):
+    while (pos < max_seq_len):
         if pos < seq_len:
             tokenized_prompt_c = [tokenized_prompt[pos]]
         else:
