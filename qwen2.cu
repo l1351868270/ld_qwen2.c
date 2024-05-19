@@ -12,7 +12,7 @@ python run.py
 #include <cuda_fp16.h>
 
 extern "C" {
-    void c_init(int batch, int max_seq_len);
+    void c_init(int batch, int max_seq_len, const char *checkpoint_path);
     int* c_qwen2_forward(int batch, int seq_len, int *data, int pos);
     // void c_generate(int batch, int seq_len, int *data, int steps);
     // void c_chat ();
@@ -196,7 +196,7 @@ void memory_map_weights(Qwen2Weights *w, Qwen2Config* p, char* ptr) {
 void qwen2_build_from_checkpoint(Qwen2 *model, const char* checkpoint_path) {
     FILE *model_file = fopen(checkpoint_path, "rb");
     if (model_file == NULL) {
-        printf("Error opening model file\n");
+        printf("Error opening model file %s\n", checkpoint_path);
     }
 
     size_t file_size = 0;
@@ -759,8 +759,11 @@ void* qwen2_forward(Context *ctx, Qwen2* qwen2, int *token, int batch, int pos) 
 
 Qwen2 py_model;
 
-void c_init(int batch, int max_seq_len) {
-    const char *checkpoint_path = "qwen1.5-0.5B.bin";
+void c_init(int batch, int max_seq_len, const char *checkpoint_path) {
+    if (checkpoint_path == NULL) {
+        checkpoint_path = "qwen1.5-0.5B.bin";
+    }
+    // const char *checkpoint_path = "qwen1.5-0.5B.bin";
     qwen2_build_from_checkpoint(&py_model, checkpoint_path);
     py_model.state.batch = batch;
     py_model.state.max_seq_len = max_seq_len;

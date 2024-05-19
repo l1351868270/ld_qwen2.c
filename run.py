@@ -5,13 +5,15 @@ python run.py
 import time
 from transformers import AutoTokenizer
 from ctypes import CDLL
-from ctypes import c_int, POINTER
+from ctypes import c_int, c_char_p, POINTER, create_string_buffer
 qwem2lib = CDLL("./qwen2.so")
 
 import sys
 sys.argv.append("-resize")
-def init(batch: int, max_seq_len: int):
-    qwem2lib.c_init(c_int(batch), c_int(max_seq_len))
+def init(batch: int, max_seq_len: int, checkpoint_path: str):
+    qwem2lib.c_init.argtypes = [c_int, c_int, c_char_p]
+    checkpoint_path_buffer = create_string_buffer(checkpoint_path.encode("utf-8"))
+    qwem2lib.c_init(c_int(batch), c_int(max_seq_len), checkpoint_path_buffer)
 
 def qwen2_forward(token, batch, seq_len, pos)->list:
     qwem2lib.c_qwen2_forward.restype = POINTER(c_int * batch)
@@ -45,7 +47,7 @@ if __name__ == '__main__':
     batch = 1
     max_seq_len = 256
     pos = 0
-    init(batch, max_seq_len)
+    init(batch, max_seq_len, "qwen1.5-1.8B.bin")
 
     output = []
     begin = time.time()

@@ -487,11 +487,11 @@ def bf16_write_model(model, filename):
 
 
 if __name__ == "__main__":
-    # python export.py --filepath="qwen1.5-0.5B_bf16.bin" --dtype="bf16" --model_type=Qwen/Qwen1.5-0.5B-Chat
     # python export.py --filepath="qwen1.5-0.5B.bin" --dtype="fp16" --model_type=Qwen/Qwen1.5-0.5B-Chat
     # python export.py --filepath="qwen1.5-0.5B_fp32.bin" --dtype="fp32" --model_type=Qwen/Qwen1.5-0.5B-Chat
-    # python export_openelm.py --filepath="openelm_270M_q40.bin" --dtype="q40" --model_type=apple/OpenELM-270M-Instruct
-    # python export_openelm.py --filepath="openelm_3B_fp16.bin" --dtype="fp16" --model_type=apple/OpenELM-3B-Instruct
+    # python export.py --filepath="qwen1.5-14B.bin" --dtype="fp16" --model_type=Qwen/Qwen1.5-14B-Chat
+    # python export.py --filepath="qwen1.5-1.8B.bin" --dtype="fp16" --model_type=Qwen/Qwen1.5-1.8B-Chat
+    # python export.py --filepath="qwen1.5-4B.bin" --dtype="fp16" --model_type=Qwen/Qwen1.5-4B-Chat
     parser = argparse.ArgumentParser()
     parser.add_argument("--filepath", type=str, default="qwen1.5-0.5B.bin")
     parser.add_argument("--model_type", type=str, default="Qwen/Qwen1.5-0.5B-Chat")
