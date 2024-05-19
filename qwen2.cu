@@ -8,8 +8,11 @@ python run.py
 #include <stdlib.h>
 #include <string>
 #include <math.h>
+#include <fcntl.h>
 #include <stdint.h>
 #include <cuda_fp16.h>
+#include <unistd.h>
+#include <sys/mman.h>
 
 extern "C" {
     void c_init(int batch, int max_seq_len, const char *checkpoint_path);
@@ -128,18 +131,18 @@ void free_run_state(RunState* s) {
 void memory_map_weights(Qwen2Weights *w, Qwen2Config* p, char* ptr) {
     int ll;
     cudaMemcpy(&ll, ptr, sizeof(int), cudaMemcpyDeviceToHost);
-    // printf("++++++++++++--------%d\n", ll);
+    printf("++++++++++++--------%d\n", ll);
     ptr += sizeof(int);
     w->embed_tokens = (half*)ptr;
     ptr += ll * sizeof(half);
     cudaMemcpy(&ll, ptr, sizeof(int), cudaMemcpyDeviceToHost);
-    // printf("++++++++++++--------%d\n", ll);
+    printf("++++++++++++--------%d\n", ll);
     ptr += sizeof(int);
     w->q_proj_w = (half*)ptr;
     ptr += ll * sizeof(half);
     cudaMemcpy(&ll, ptr, sizeof(int), cudaMemcpyDeviceToHost);
     ptr += sizeof(int);
-    // printf("++++++++++++--------%d\n", ll);
+    printf("++++++++++++--------%d\n", ll);
     w->q_proj_b = (half*)ptr;
     ptr += ll * sizeof(half);
     cudaMemcpy(&ll, ptr, sizeof(int), cudaMemcpyDeviceToHost);
@@ -187,7 +190,7 @@ void memory_map_weights(Qwen2Weights *w, Qwen2Config* p, char* ptr) {
     w->norm = (half*)ptr;
     ptr += ll * sizeof(half);
     cudaMemcpy(&ll, ptr, sizeof(int), cudaMemcpyDeviceToHost);
-    // printf("++++++++++++--------%d\n", ll);
+    printf("++++++++++++--------%d\n", ll);
     ptr += sizeof(int);
     w->lm_head = (half*)ptr;
 }
@@ -236,29 +239,37 @@ void qwen2_build_from_checkpoint(Qwen2 *model, const char* checkpoint_path) {
     printf("config sliding_window is: %d\n", model->config.sliding_window);
     printf("config vocab_size is: %d\n", model->config.vocab_size);
 
-    
     size_t model_size = file_size - sizeof(model->config) - sizeof(int);
     printf("model_size: %ld bytes, via %f KB, via %f MB, via %f GB\n", 
             model_size, (float)model_size / 1024, (float)model_size / 1024 / 1024, (float)model_size / 1024 / 1024 / 1024);
-    char *host_memory = (char*)malloc(model_size);
-    rcount = fread(host_memory, sizeof(char), model_size, model_file);
-    if (rcount != model_size) {
-        fprintf(stderr, "Bad read model from model file %s\n", checkpoint_path);
-        exit(1);
-    }
-    // model->num_parameters = model_size / sizeof(float);
-    // printf("num_parameters: %d\n", model->num_parameters);
 
-    
+    fclose(model_file);
+
+    int fd = open(checkpoint_path, O_RDONLY);
+    if (fd == -1) { fprintf(stderr, "open failed!\n"); exit(EXIT_FAILURE); }
+    void *data;
+    data = mmap(NULL, file_size, PROT_READ, MAP_PRIVATE, fd, 0);
+    if (data == MAP_FAILED) { fprintf(stderr, "mmap failed!\n"); exit(EXIT_FAILURE); }
+
+    char *host_memory = (char*)data + sizeof(int) + sizeof(Qwen2Config);
     void *device_memory;
-    // cudaError_t err;
+    cudaError_t err;
     cudaMalloc((void**)&device_memory, model_size);
-    // err = cudaGetLastError();
+    err = cudaGetLastError();
+    if (err != cudaSuccess) {
+        fprintf(stderr, "cudaMalloc failed %ld\n", model_size);
+        exit(-1);
+    }
     // printf("%s\n", cudaGetErrorName(err));
     cudaMemcpy(device_memory, host_memory, model_size, cudaMemcpyHostToDevice);
+    err = cudaGetLastError();
+    if (err != cudaSuccess) {
+        fprintf(stderr, "cudaMemcpy failed %ld\n", model_size);
+        exit(-1);
+    }
     memory_map_weights(&model->weights, &model->config, (char*)device_memory);
     
-    free(host_memory);
+    // free(host_memory);
 }
 
 typedef struct {
@@ -269,7 +280,8 @@ __device__ bool thread0() {
     return (!threadIdx.x && !threadIdx.y && !threadIdx.z) && (!blockIdx.x && !blockIdx.y && !blockIdx.z);
 }
 
-__global__ void get_content_row(float *x, half* embed_tokens, int *token, int batch, int dim) {
+__global__ 
+void get_content_row(float *x, half* embed_tokens, int *token, int batch, int dim) {
     int bidx = blockIdx.x; // batch
     int bidy = blockIdx.y; // dim = 
     int tidx = threadIdx.x;
@@ -659,14 +671,14 @@ void argmax_forward(int* output, float* input, int batch, int dim) {
     
     output[b] = max_i;
 
-    if (thread0()) {
-        printf("argmax:\n");
-        printf("[");
-        for (int b = 0; b < batch; b++) {
-            printf("%d, ", output[b]);
-        }
-        printf("]\n");
-    }
+    // if (thread0()) {
+    //     printf("argmax:\n");
+    //     printf("[");
+    //     for (int b = 0; b < batch; b++) {
+    //         printf("%d, ", output[b]);
+    //     }
+    //     printf("]\n");
+    // }
 }
 
 void* qwen2_forward(Context *ctx, Qwen2* qwen2, int *token, int batch, int pos) {
@@ -792,10 +804,10 @@ int* c_qwen2_forward(int batch, int seq_len, int *data, int pos) {
         cudaMemcpy(s->next_cpu + i, s->next + i, sizeof(int), cudaMemcpyDeviceToHost);
     }
     
-    printf("pos:%d ", pos+1);
-    for (int i = 0; i < s->batch; i++) {
-        printf("%d ", s->next_cpu[i]);
-    }
-    printf("\n");
+    // printf("pos:%d ", pos+1);
+    // for (int i = 0; i < s->batch; i++) {
+    //     printf("%d ", s->next_cpu[i]);
+    // }
+    // printf("\n");
     return s->next_cpu;
 }

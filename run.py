@@ -47,6 +47,7 @@ if __name__ == '__main__':
     batch = 1
     max_seq_len = 256
     pos = 0
+    # init(batch, max_seq_len, "qwen1.5-0.5B.bin")
     init(batch, max_seq_len, "qwen1.5-1.8B.bin")
 
     output = []
