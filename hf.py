@@ -1,10 +1,13 @@
+
+import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer
-device = "cuda" # the device to load the model onto
+
+device = "cpu" # the device to load the model onto
 
 model = AutoModelForCausalLM.from_pretrained(
     "Qwen/Qwen1.5-0.5B-Chat",
-    torch_dtype="auto",
-    device_map="auto"
+    torch_dtype=torch.float32,
+    device_map=device
 )
 tokenizer = AutoTokenizer.from_pretrained("Qwen/Qwen1.5-0.5B-Chat")
 
