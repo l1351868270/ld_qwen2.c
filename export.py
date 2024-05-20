@@ -51,7 +51,7 @@ def fp32_write_model(model, filename):
         keys_len = 0
         # embedder 4
         ll = config.hidden_size * config.vocab_size
-        file.write(struct.pack("i", ll))
+        file.write(struct.pack("Q", ll))
         write_fp32(sd["model.embed_tokens.weight"], file)
         # print(sd["model.embed_tokens.weight"].shape) # [hidden_size, vocab_size] [151936, 1024]
         keys_len += 1
@@ -61,7 +61,7 @@ def fp32_write_model(model, filename):
 
         ll = config.num_hidden_layers * config.hidden_size * (num_heads * head_dim)
         # print(f"ll={ll}")
-        file.write(struct.pack("i", ll))
+        file.write(struct.pack("Q", ll))
         for i in range(config.num_hidden_layers): 
             write_fp32(sd[f"model.layers.{i}.self_attn.q_proj.weight"], file) # [hidden_size, num_heads * head_dim] [1024, 1024]
             # print(sd[f"model.layers.{i}.self_attn.q_proj.weight"].shape)
@@ -69,7 +69,7 @@ def fp32_write_model(model, filename):
 
         ll = config.num_hidden_layers * (num_heads * head_dim)
         # print(f"ll={ll}")
-        file.write(struct.pack("i", ll))
+        file.write(struct.pack("Q", ll))
         for i in range(config.num_hidden_layers): 
             write_fp32(sd[f"model.layers.{i}.self_attn.q_proj.bias"], file) # [num_heads * head_dim] [1024]
             # print(sd[f"model.layers.{i}.self_attn.q_proj.bias"].shape)
@@ -77,7 +77,7 @@ def fp32_write_model(model, filename):
 
         ll = config.num_hidden_layers * config.hidden_size * (config.num_key_value_heads * head_dim)
         # print(f"ll={ll}")
-        file.write(struct.pack("i", ll))
+        file.write(struct.pack("Q", ll))
         for i in range(config.num_hidden_layers): 
             write_fp32(sd[f"model.layers.{i}.self_attn.k_proj.weight"], file) # [hidden_size, num_key_value_heads * head_dim] [1024, 1024]
             # print(sd[f"model.layers.{i}.self_attn.k_proj.weight"].shape)
@@ -85,7 +85,7 @@ def fp32_write_model(model, filename):
 
         ll = config.num_hidden_layers * (config.num_key_value_heads * head_dim)
         # print(f"ll={ll}")
-        file.write(struct.pack("i", ll))
+        file.write(struct.pack("Q", ll))
         for i in range(config.num_hidden_layers): 
             write_fp32(sd[f"model.layers.{i}.self_attn.k_proj.bias"], file) # [num_key_value_heads * head_dim] [1024]
             # print(sd[f"model.layers.{i}.self_attn.k_proj.bias"].shape)
@@ -93,7 +93,7 @@ def fp32_write_model(model, filename):
 
         ll = config.num_hidden_layers * config.hidden_size * (config.num_key_value_heads * head_dim)
         # print(f"ll={ll}")
-        file.write(struct.pack("i", ll))
+        file.write(struct.pack("Q", ll))
         for i in range(config.num_hidden_layers): 
             write_fp32(sd[f"model.layers.{i}.self_attn.v_proj.weight"], file) # [hidden_size, num_key_value_heads * head_dim] [1024, 1024]
             # print(sd[f"model.layers.{i}.self_attn.v_proj.weight"].shape)
@@ -101,7 +101,7 @@ def fp32_write_model(model, filename):
 
         ll = config.num_hidden_layers * (config.num_key_value_heads * head_dim)
         # print(f"ll={ll}")
-        file.write(struct.pack("i", ll))
+        file.write(struct.pack("Q", ll))
         for i in range(config.num_hidden_layers): 
             write_fp32(sd[f"model.layers.{i}.self_attn.v_proj.bias"], file) # [num_key_value_heads * head_dim] [1024]
             # print(sd[f"model.layers.{i}.self_attn.v_proj.bias"].shape)
@@ -110,7 +110,7 @@ def fp32_write_model(model, filename):
 
         ll = config.num_hidden_layers * (num_heads * head_dim) * config.hidden_size
         # print(f"ll={ll}")
-        file.write(struct.pack("i", ll))
+        file.write(struct.pack("Q", ll))
         for i in range(config.num_hidden_layers): 
             write_fp32(sd[f"model.layers.{i}.self_attn.o_proj.weight"], file) # [num_heads * head_dim, hidden_size] [1024, 1024]
             # print(sd[f"model.layers.{i}.self_attn.o_proj.weight"].shape)
@@ -118,7 +118,7 @@ def fp32_write_model(model, filename):
 
         ll = config.num_hidden_layers * config.hidden_size * config.intermediate_size
         # print(f"ll={ll}")
-        file.write(struct.pack("i", ll))
+        file.write(struct.pack("Q", ll))
         for i in range(config.num_hidden_layers): 
             write_fp32(sd[f"model.layers.{i}.mlp.gate_proj.weight"], file) # [intermediate_size, hidden_size]  [2816, 1024]
             # print(sd[f"model.layers.{i}.mlp.gate_proj.weight"].shape)
@@ -126,7 +126,7 @@ def fp32_write_model(model, filename):
 
         ll = config.num_hidden_layers * config.hidden_size * config.intermediate_size
         # print(f"ll={ll}")
-        file.write(struct.pack("i", ll))
+        file.write(struct.pack("Q", ll))
         for i in range(config.num_hidden_layers): 
             write_fp32(sd[f"model.layers.{i}.mlp.up_proj.weight"], file) # [intermediate_size, hidden_size] [2816, 1024]
             # print(sd[f"model.layers.{i}.mlp.up_proj.weight"].shape)
@@ -134,7 +134,7 @@ def fp32_write_model(model, filename):
         
         ll = config.num_hidden_layers * config.intermediate_size * config.hidden_size
         # print(f"ll={ll}")
-        file.write(struct.pack("i", ll))
+        file.write(struct.pack("Q", ll))
         for i in range(config.num_hidden_layers): 
             write_fp32(sd[f"model.layers.{i}.mlp.down_proj.weight"], file) # [hidden_size, intermediate_size] [1024, 2816]
             # print(sd[f"model.layers.{i}.mlp.down_proj.weight"].shape)
@@ -142,7 +142,7 @@ def fp32_write_model(model, filename):
 
         ll = config.num_hidden_layers * config.hidden_size
         # print(f"ll={ll}")
-        file.write(struct.pack("i", ll))
+        file.write(struct.pack("Q", ll))
         for i in range(config.num_hidden_layers): 
             write_fp32(sd[f"model.layers.{i}.input_layernorm.weight"], file) # [hidden_size] [1024]
             # print(sd[f"model.layers.{i}.input_layernorm.weight"].shape)
@@ -150,20 +150,20 @@ def fp32_write_model(model, filename):
 
         ll = config.num_hidden_layers * config.hidden_size
         # print(f"ll={ll}")
-        file.write(struct.pack("i", ll))
+        file.write(struct.pack("Q", ll))
         for i in range(config.num_hidden_layers): 
             write_fp32(sd[f"model.layers.{i}.post_attention_layernorm.weight"], file) # [hidden_size] [1024]
             # print(sd[f"model.layers.{i}.post_attention_layernorm.weight"].shape)
         keys_len += config.num_hidden_layers
 
         ll = config.hidden_size
-        file.write(struct.pack("i", ll))
+        file.write(struct.pack("Q", ll))
         write_fp32(sd[f"model.norm.weight"], file)
         # print(sd[f"model.norm.weight"].shape)
         keys_len += 1
 
         ll = config.vocab_size * config.hidden_size
-        file.write(struct.pack("i", ll))
+        file.write(struct.pack("Q", ll))
         write_fp32(sd[f"lm_head.weight"], file) # [vocab_size, hidden_size] [151936, 1024]
         # print(sd[f"lm_head.weight"].shape)
         keys_len += 1
@@ -207,7 +207,7 @@ def fp16_write_model(model, filename):
         keys_len = 0
         # embedder 4
         ll = config.hidden_size * config.vocab_size
-        file.write(struct.pack("i", ll))
+        file.write(struct.pack("Q", ll))
         write_fp16(sd["model.embed_tokens.weight"], file)
         # print(sd["model.embed_tokens.weight"])
         # print(sd["model.embed_tokens.weight"].shape) # [hidden_size, vocab_size] [151936, 1024]
@@ -218,7 +218,7 @@ def fp16_write_model(model, filename):
 
         ll = config.num_hidden_layers * config.hidden_size * (num_heads * head_dim)
         # print(f"ll={ll}")
-        file.write(struct.pack("i", ll))
+        file.write(struct.pack("Q", ll))
         for i in range(config.num_hidden_layers): 
             write_fp16(sd[f"model.layers.{i}.self_attn.q_proj.weight"], file) # [hidden_size, num_heads * head_dim] [1024, 1024]
             # print(sd[f"model.layers.{i}.self_attn.q_proj.weight"].shape)
@@ -226,7 +226,7 @@ def fp16_write_model(model, filename):
 
         ll = config.num_hidden_layers * (num_heads * head_dim)
         # print(f"ll={ll}")
-        file.write(struct.pack("i", ll))
+        file.write(struct.pack("Q", ll))
         for i in range(config.num_hidden_layers): 
             write_fp16(sd[f"model.layers.{i}.self_attn.q_proj.bias"], file) # [num_heads * head_dim] [1024]
             # print(sd[f"model.layers.{i}.self_attn.q_proj.bias"].shape)
@@ -234,7 +234,7 @@ def fp16_write_model(model, filename):
 
         ll = config.num_hidden_layers * config.hidden_size * (config.num_key_value_heads * head_dim)
         # print(f"ll={ll}")
-        file.write(struct.pack("i", ll))
+        file.write(struct.pack("Q", ll))
         for i in range(config.num_hidden_layers): 
             write_fp16(sd[f"model.layers.{i}.self_attn.k_proj.weight"], file) # [hidden_size, num_key_value_heads * head_dim] [1024, 1024]
             # print(sd[f"model.layers.{i}.self_attn.k_proj.weight"].shape)
@@ -242,7 +242,7 @@ def fp16_write_model(model, filename):
 
         ll = config.num_hidden_layers * (config.num_key_value_heads * head_dim)
         # print(f"ll={ll}")
-        file.write(struct.pack("i", ll))
+        file.write(struct.pack("Q", ll))
         for i in range(config.num_hidden_layers): 
             write_fp16(sd[f"model.layers.{i}.self_attn.k_proj.bias"], file) # [num_key_value_heads * head_dim] [1024]
             # print(sd[f"model.layers.{i}.self_attn.k_proj.bias"].shape)
@@ -250,7 +250,7 @@ def fp16_write_model(model, filename):
 
         ll = config.num_hidden_layers * config.hidden_size * (config.num_key_value_heads * head_dim)
         # print(f"ll={ll}")
-        file.write(struct.pack("i", ll))
+        file.write(struct.pack("Q", ll))
         for i in range(config.num_hidden_layers): 
             write_fp16(sd[f"model.layers.{i}.self_attn.v_proj.weight"], file) # [hidden_size, num_key_value_heads * head_dim] [1024, 1024]
             # print(sd[f"model.layers.{i}.self_attn.v_proj.weight"].shape)
@@ -258,7 +258,7 @@ def fp16_write_model(model, filename):
 
         ll = config.num_hidden_layers * (config.num_key_value_heads * head_dim)
         # print(f"ll={ll}")
-        file.write(struct.pack("i", ll))
+        file.write(struct.pack("Q", ll))
         for i in range(config.num_hidden_layers): 
             write_fp16(sd[f"model.layers.{i}.self_attn.v_proj.bias"], file) # [num_key_value_heads * head_dim] [1024]
             # print(sd[f"model.layers.{i}.self_attn.v_proj.bias"].shape)
@@ -267,7 +267,7 @@ def fp16_write_model(model, filename):
 
         ll = config.num_hidden_layers * (num_heads * head_dim) * config.hidden_size
         # print(f"ll={ll}")
-        file.write(struct.pack("i", ll))
+        file.write(struct.pack("Q", ll))
         for i in range(config.num_hidden_layers): 
             write_fp16(sd[f"model.layers.{i}.self_attn.o_proj.weight"], file) # [num_heads * head_dim, hidden_size] [1024, 1024]
             # print(sd[f"model.layers.{i}.self_attn.o_proj.weight"].shape)
@@ -275,7 +275,7 @@ def fp16_write_model(model, filename):
 
         ll = config.num_hidden_layers * config.hidden_size * config.intermediate_size
         # print(f"ll={ll}")
-        file.write(struct.pack("i", ll))
+        file.write(struct.pack("Q", ll))
         for i in range(config.num_hidden_layers): 
             write_fp16(sd[f"model.layers.{i}.mlp.gate_proj.weight"], file) # [intermediate_size, hidden_size]  [2816, 1024]
             # print(sd[f"model.layers.{i}.mlp.gate_proj.weight"].shape)
@@ -283,7 +283,7 @@ def fp16_write_model(model, filename):
 
         ll = config.num_hidden_layers * config.hidden_size * config.intermediate_size
         # print(f"ll={ll}")
-        file.write(struct.pack("i", ll))
+        file.write(struct.pack("Q", ll))
         for i in range(config.num_hidden_layers): 
             write_fp16(sd[f"model.layers.{i}.mlp.up_proj.weight"], file) # [intermediate_size, hidden_size] [2816, 1024]
             # print(sd[f"model.layers.{i}.mlp.up_proj.weight"].shape)
@@ -291,7 +291,7 @@ def fp16_write_model(model, filename):
         
         ll = config.num_hidden_layers * config.intermediate_size * config.hidden_size
         # print(f"ll={ll}")
-        file.write(struct.pack("i", ll))
+        file.write(struct.pack("Q", ll))
         for i in range(config.num_hidden_layers): 
             write_fp16(sd[f"model.layers.{i}.mlp.down_proj.weight"], file) # [hidden_size, intermediate_size] [1024, 2816]
             # print(sd[f"model.layers.{i}.mlp.down_proj.weight"].shape)
@@ -299,7 +299,7 @@ def fp16_write_model(model, filename):
 
         ll = config.num_hidden_layers * config.hidden_size
         # print(f"ll={ll}")
-        file.write(struct.pack("i", ll))
+        file.write(struct.pack("Q", ll))
         for i in range(config.num_hidden_layers): 
             write_fp16(sd[f"model.layers.{i}.input_layernorm.weight"], file) # [hidden_size] [1024]
             # print(sd[f"model.layers.{i}.input_layernorm.weight"].shape)
@@ -307,20 +307,20 @@ def fp16_write_model(model, filename):
 
         ll = config.num_hidden_layers * config.hidden_size
         # print(f"ll={ll}")
-        file.write(struct.pack("i", ll))
+        file.write(struct.pack("Q", ll))
         for i in range(config.num_hidden_layers): 
             write_fp16(sd[f"model.layers.{i}.post_attention_layernorm.weight"], file) # [hidden_size] [1024]
             # print(sd[f"model.layers.{i}.post_attention_layernorm.weight"].shape)
         keys_len += config.num_hidden_layers
 
         ll = config.hidden_size
-        file.write(struct.pack("i", ll))
+        file.write(struct.pack("Q", ll))
         write_fp16(sd[f"model.norm.weight"], file)
         # print(sd[f"model.norm.weight"].shape)
         keys_len += 1
 
         ll = config.vocab_size * config.hidden_size
-        file.write(struct.pack("i", ll))
+        file.write(struct.pack("Q", ll))
         write_fp16(sd[f"lm_head.weight"], file) # [vocab_size, hidden_size] [151936, 1024]
         # print(sd[f"lm_head.weight"].shape)
         keys_len += 1
@@ -364,7 +364,7 @@ def bf16_write_model(model, filename):
         keys_len = 0
         # embedder 4
         ll = config.hidden_size * config.vocab_size
-        file.write(struct.pack("i", ll))
+        file.write(struct.pack("Q", ll))
         write_fp32(sd["model.embed_tokens.weight"], file)
         print(sd["model.embed_tokens.weight"].dtype) # [hidden_size, vocab_size] [151936, 1024]
         print(sd["model.embed_tokens.weight"])
@@ -375,7 +375,7 @@ def bf16_write_model(model, filename):
 
         ll = config.num_hidden_layers * config.hidden_size * (num_heads * head_dim)
         # print(f"ll={ll}")
-        file.write(struct.pack("i", ll))
+        file.write(struct.pack("Q", ll))
         for i in range(config.num_hidden_layers): 
             write_fp32(sd[f"model.layers.{i}.self_attn.q_proj.weight"], file) # [hidden_size, num_heads * head_dim] [1024, 1024]
             # print(sd[f"model.layers.{i}.self_attn.q_proj.weight"].shape)
@@ -383,7 +383,7 @@ def bf16_write_model(model, filename):
 
         ll = config.num_hidden_layers * (num_heads * head_dim)
         # print(f"ll={ll}")
-        file.write(struct.pack("i", ll))
+        file.write(struct.pack("Q", ll))
         for i in range(config.num_hidden_layers): 
             write_fp32(sd[f"model.layers.{i}.self_attn.q_proj.bias"], file) # [num_heads * head_dim] [1024]
             # print(sd[f"model.layers.{i}.self_attn.q_proj.bias"].shape)
@@ -391,7 +391,7 @@ def bf16_write_model(model, filename):
 
         ll = config.num_hidden_layers * config.hidden_size * (config.num_key_value_heads * head_dim)
         # print(f"ll={ll}")
-        file.write(struct.pack("i", ll))
+        file.write(struct.pack("Q", ll))
         for i in range(config.num_hidden_layers): 
             write_fp32(sd[f"model.layers.{i}.self_attn.k_proj.weight"], file) # [hidden_size, num_key_value_heads * head_dim] [1024, 1024]
             # print(sd[f"model.layers.{i}.self_attn.k_proj.weight"].shape)
@@ -399,7 +399,7 @@ def bf16_write_model(model, filename):
 
         ll = config.num_hidden_layers * (config.num_key_value_heads * head_dim)
         # print(f"ll={ll}")
-        file.write(struct.pack("i", ll))
+        file.write(struct.pack("Q", ll))
         for i in range(config.num_hidden_layers): 
             write_fp32(sd[f"model.layers.{i}.self_attn.k_proj.bias"], file) # [num_key_value_heads * head_dim] [1024]
             # print(sd[f"model.layers.{i}.self_attn.k_proj.bias"].shape)
@@ -407,7 +407,7 @@ def bf16_write_model(model, filename):
 
         ll = config.num_hidden_layers * config.hidden_size * (config.num_key_value_heads * head_dim)
         # print(f"ll={ll}")
-        file.write(struct.pack("i", ll))
+        file.write(struct.pack("Q", ll))
         for i in range(config.num_hidden_layers): 
             write_fp32(sd[f"model.layers.{i}.self_attn.v_proj.weight"], file) # [hidden_size, num_key_value_heads * head_dim] [1024, 1024]
             # print(sd[f"model.layers.{i}.self_attn.v_proj.weight"].shape)
@@ -415,7 +415,7 @@ def bf16_write_model(model, filename):
 
         ll = config.num_hidden_layers * (config.num_key_value_heads * head_dim)
         # print(f"ll={ll}")
-        file.write(struct.pack("i", ll))
+        file.write(struct.pack("Q", ll))
         for i in range(config.num_hidden_layers): 
             write_fp32(sd[f"model.layers.{i}.self_attn.v_proj.bias"], file) # [num_key_value_heads * head_dim] [1024]
             # print(sd[f"model.layers.{i}.self_attn.v_proj.bias"].shape)
@@ -424,7 +424,7 @@ def bf16_write_model(model, filename):
 
         ll = config.num_hidden_layers * (num_heads * head_dim) * config.hidden_size
         # print(f"ll={ll}")
-        file.write(struct.pack("i", ll))
+        file.write(struct.pack("Q", ll))
         for i in range(config.num_hidden_layers): 
             write_fp32(sd[f"model.layers.{i}.self_attn.o_proj.weight"], file) # [num_heads * head_dim, hidden_size] [1024, 1024]
             # print(sd[f"model.layers.{i}.self_attn.o_proj.weight"].shape)
@@ -432,7 +432,7 @@ def bf16_write_model(model, filename):
 
         ll = config.num_hidden_layers * config.hidden_size * config.intermediate_size
         # print(f"ll={ll}")
-        file.write(struct.pack("i", ll))
+        file.write(struct.pack("Q", ll))
         for i in range(config.num_hidden_layers): 
             write_fp32(sd[f"model.layers.{i}.mlp.gate_proj.weight"], file) # [intermediate_size, hidden_size]  [2816, 1024]
             # print(sd[f"model.layers.{i}.mlp.gate_proj.weight"].shape)
@@ -440,7 +440,7 @@ def bf16_write_model(model, filename):
 
         ll = config.num_hidden_layers * config.hidden_size * config.intermediate_size
         # print(f"ll={ll}")
-        file.write(struct.pack("i", ll))
+        file.write(struct.pack("Q", ll))
         for i in range(config.num_hidden_layers): 
             write_fp32(sd[f"model.layers.{i}.mlp.up_proj.weight"], file) # [intermediate_size, hidden_size] [2816, 1024]
             # print(sd[f"model.layers.{i}.mlp.up_proj.weight"].shape)
@@ -448,7 +448,7 @@ def bf16_write_model(model, filename):
         
         ll = config.num_hidden_layers * config.intermediate_size * config.hidden_size
         # print(f"ll={ll}")
-        file.write(struct.pack("i", ll))
+        file.write(struct.pack("Q", ll))
         for i in range(config.num_hidden_layers): 
             write_fp32(sd[f"model.layers.{i}.mlp.down_proj.weight"], file) # [hidden_size, intermediate_size] [1024, 2816]
             # print(sd[f"model.layers.{i}.mlp.down_proj.weight"].shape)
@@ -456,7 +456,7 @@ def bf16_write_model(model, filename):
 
         ll = config.num_hidden_layers * config.hidden_size
         # print(f"ll={ll}")
-        file.write(struct.pack("i", ll))
+        file.write(struct.pack("Q", ll))
         for i in range(config.num_hidden_layers): 
             write_fp32(sd[f"model.layers.{i}.input_layernorm.weight"], file) # [hidden_size] [1024]
             # print(sd[f"model.layers.{i}.input_layernorm.weight"].shape)
@@ -464,20 +464,20 @@ def bf16_write_model(model, filename):
 
         ll = config.num_hidden_layers * config.hidden_size
         # print(f"ll={ll}")
-        file.write(struct.pack("i", ll))
+        file.write(struct.pack("Q", ll))
         for i in range(config.num_hidden_layers): 
             write_fp32(sd[f"model.layers.{i}.post_attention_layernorm.weight"], file) # [hidden_size] [1024]
             # print(sd[f"model.layers.{i}.post_attention_layernorm.weight"].shape)
         keys_len += config.num_hidden_layers
 
         ll = config.hidden_size
-        file.write(struct.pack("i", ll))
+        file.write(struct.pack("Q", ll))
         write_fp32(sd[f"model.norm.weight"], file)
         # print(sd[f"model.norm.weight"].shape)
         keys_len += 1
 
         ll = config.vocab_size * config.hidden_size
-        file.write(struct.pack("i", ll))
+        file.write(struct.pack("Q", ll))
         write_fp32(sd[f"lm_head.weight"], file) # [vocab_size, hidden_size] [151936, 1024]
         # print(sd[f"lm_head.weight"].shape)
         keys_len += 1
@@ -487,11 +487,15 @@ def bf16_write_model(model, filename):
 
 
 if __name__ == "__main__":
-    # python export.py --filepath="qwen1.5-0.5B.bin" --dtype="fp16" --model_type=Qwen/Qwen1.5-0.5B-Chat
-    # python export.py --filepath="qwen1.5-0.5B_fp32.bin" --dtype="fp32" --model_type=Qwen/Qwen1.5-0.5B-Chat
-    # python export.py --filepath="qwen1.5-14B.bin" --dtype="fp16" --model_type=Qwen/Qwen1.5-14B-Chat
-    # python export.py --filepath="qwen1.5-1.8B.bin" --dtype="fp16" --model_type=Qwen/Qwen1.5-1.8B-Chat
-    # python export.py --filepath="qwen1.5-4B.bin" --dtype="fp16" --model_type=Qwen/Qwen1.5-4B-Chat
+    '''
+    python export.py --filepath="qwen1.5-0.5B.bin" --dtype="fp16" --model_type=Qwen/Qwen1.5-0.5B-Chat
+    python export.py --filepath="qwen1.5-0.5B_fp32.bin" --dtype="fp32" --model_type=Qwen/Qwen1.5-0.5B-Chat
+ 
+    python export.py --filepath="qwen1.5-1.8B.bin" --dtype="fp16" --model_type=Qwen/Qwen1.5-1.8B-Chat
+    python export.py --filepath="qwen1.5-4B.bin" --dtype="fp16" --model_type=Qwen/Qwen1.5-4B-Chat
+    python export.py --filepath="qwen1.5-14B.bin" --dtype="fp16" --model_type=Qwen/Qwen1.5-14B-Chat
+    python export.py --filepath="qwen1.5-14B.bin" --dtype="fp16" --model_type=Qwen/Qwen1.5-14B-Chat
+    '''
     parser = argparse.ArgumentParser()
     parser.add_argument("--filepath", type=str, default="qwen1.5-0.5B.bin")
     parser.add_argument("--model_type", type=str, default="Qwen/Qwen1.5-0.5B-Chat")

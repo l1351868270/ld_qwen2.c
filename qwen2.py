@@ -143,6 +143,7 @@ def generate1(model, tokenizer, tokenized_prompt, steps):
     tokenized_prompt = torch.tensor([tokenized_prompt])
     # print(tokenized_prompt.shape)
     config = model.config
+    # model.generate
     pos = 0
     past_key_values_length = 0
     seq_length = tokenized_prompt.shape[-1]

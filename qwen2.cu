@@ -1,5 +1,5 @@
 /*
-nvcc --shared -Xcompiler -fPIC -o qwen2.so -O3 qwen2.cu -lm -gencode arch=compute_80,code=sm_80
+nvcc --shared -Xcompiler -fPIC -o qwen2.so -O3 qwen2.cu -lm -gencode arch=compute_86,code=sm_86 -gencode arch=compute_86,code=sm_86
 python run.py
 */
 
@@ -93,22 +93,45 @@ void malloc_run_state(RunState* s, Qwen2Config* p) {
     int batch = s->batch;
     int hidden_size = p->hidden_size;
     int intermediate_size = p->intermediate_size;
+    
     int num_heads = p->num_attention_heads;
     int head_dim = p->hidden_size / num_heads;
+    int num_key_value_heads = p->num_key_value_heads;
+
+    int num_hidden_layers = p->num_hidden_layers;
+
+    unsigned long long run_cache = 0;
 
     cudaMalloc((void**)&s->x, batch * hidden_size * sizeof(float));
+    run_cache += batch * hidden_size * sizeof(float);
     cudaMalloc((void**)&s->xb, batch * hidden_size * sizeof(float));
+    run_cache += batch * hidden_size * sizeof(float);
     cudaMalloc((void**)&s->xb2, batch * hidden_size * sizeof(float));
+    run_cache += batch * hidden_size * sizeof(float);
     cudaMalloc((void**)&s->hb, batch * intermediate_size * sizeof(float));
+    run_cache += batch * intermediate_size * sizeof(float);
     cudaMalloc((void**)&s->hb2, batch * intermediate_size * sizeof(float));
+    run_cache += batch * intermediate_size * sizeof(float);
     cudaMalloc((void**)&s->q, batch * hidden_size * sizeof(float));
+    run_cache += batch * hidden_size * sizeof(float);
     cudaMalloc((void**)&s->att, s->batch * num_heads * seq_len * sizeof(float));
-    cudaMalloc((void**)&s->key_cache, batch * p->num_hidden_layers * seq_len * num_heads * head_dim * sizeof(float));
-    cudaMalloc((void**)&s->value_cache, batch * p->num_hidden_layers * seq_len * num_heads * head_dim * sizeof(float));
-
+    run_cache += s->batch * num_heads * seq_len * sizeof(float);
+    unsigned long long kv_cache_size = batch * num_hidden_layers * seq_len * num_key_value_heads * head_dim * sizeof(float);
+    cudaMalloc((void**)&s->key_cache, kv_cache_size);
+    run_cache += kv_cache_size;
+    cudaMalloc((void**)&s->value_cache, kv_cache_size);
+    run_cache += kv_cache_size;
+    printf("total kv cache size: %llu bytes, via %fKB, via %fMB, via %fGB\n", 2 * kv_cache_size, 
+            (float)kv_cache_size  * 2.0 / 1024, (float)kv_cache_size  * 2.0 / 1024 / 1024, (float)kv_cache_size  * 2.0 / 1024 / 1024 / 1024);
     cudaMalloc((void**)&s->logits, batch * p->vocab_size * sizeof(float));
+    run_cache += batch * p->vocab_size * sizeof(float);
     cudaMalloc((void**)&s->next, batch * sizeof(int));
+    run_cache += batch * sizeof(int);
     cudaMalloc((void**)&s->token, batch * sizeof(int));
+    run_cache += batch * sizeof(int);
+    printf("total run cache size: %llu bytes, via %fKB, via %fMB, via %fGB\n", run_cache, 
+            (float)run_cache / 1024, (float)run_cache / 1024 / 1024, (float)run_cache / 1024 / 1024 / 1024);
+
     s->next_cpu = (int*)malloc(batch * sizeof(int));
 }
 
@@ -129,69 +152,69 @@ void free_run_state(RunState* s) {
 }
 
 void memory_map_weights(Qwen2Weights *w, Qwen2Config* p, char* ptr) {
-    int ll;
-    cudaMemcpy(&ll, ptr, sizeof(int), cudaMemcpyDeviceToHost);
-    printf("++++++++++++--------%d\n", ll);
-    ptr += sizeof(int);
+    unsigned long long ll;
+    cudaMemcpy(&ll, ptr, sizeof(unsigned long long), cudaMemcpyDeviceToHost);
+    // printf("++++++++++++--------%llu\n", ll);
+    ptr += sizeof(unsigned long long);
     w->embed_tokens = (half*)ptr;
     ptr += ll * sizeof(half);
-    cudaMemcpy(&ll, ptr, sizeof(int), cudaMemcpyDeviceToHost);
-    printf("++++++++++++--------%d\n", ll);
-    ptr += sizeof(int);
+    cudaMemcpy(&ll, ptr, sizeof(unsigned long long), cudaMemcpyDeviceToHost);
+    // printf("++++++++++++--------%llu\n", ll);
+    ptr += sizeof(unsigned long long);
     w->q_proj_w = (half*)ptr;
     ptr += ll * sizeof(half);
-    cudaMemcpy(&ll, ptr, sizeof(int), cudaMemcpyDeviceToHost);
-    ptr += sizeof(int);
-    printf("++++++++++++--------%d\n", ll);
+    cudaMemcpy(&ll, ptr, sizeof(unsigned long long), cudaMemcpyDeviceToHost);
+    ptr += sizeof(unsigned long long);
+    // printf("++++++++++++--------%llu\n", ll);
     w->q_proj_b = (half*)ptr;
     ptr += ll * sizeof(half);
-    cudaMemcpy(&ll, ptr, sizeof(int), cudaMemcpyDeviceToHost);
-    ptr += sizeof(int);
+    cudaMemcpy(&ll, ptr, sizeof(unsigned long long), cudaMemcpyDeviceToHost);
+    ptr += sizeof(unsigned long long);
     w->k_proj_w = (half*)ptr;
     ptr += ll * sizeof(half);
-    cudaMemcpy(&ll, ptr, sizeof(int), cudaMemcpyDeviceToHost);
-    ptr += sizeof(int);
+    cudaMemcpy(&ll, ptr, sizeof(unsigned long long), cudaMemcpyDeviceToHost);
+    ptr += sizeof(unsigned long long);
     w->k_proj_b = (half*)ptr;
     ptr += ll * sizeof(half);
-    cudaMemcpy(&ll, ptr, sizeof(int), cudaMemcpyDeviceToHost);
-    ptr += sizeof(int);
+    cudaMemcpy(&ll, ptr, sizeof(unsigned long long), cudaMemcpyDeviceToHost);
+    ptr += sizeof(unsigned long long);
     w->v_proj_w = (half*)ptr;
     ptr += ll * sizeof(half);
-    cudaMemcpy(&ll, ptr, sizeof(int), cudaMemcpyDeviceToHost);
-    ptr += sizeof(int);
+    cudaMemcpy(&ll, ptr, sizeof(unsigned long long), cudaMemcpyDeviceToHost);
+    ptr += sizeof(unsigned long long);
     w->v_proj_b = (half*)ptr;
     ptr += ll * sizeof(half);
-    cudaMemcpy(&ll, ptr, sizeof(int), cudaMemcpyDeviceToHost);
-    ptr += sizeof(int);
+    cudaMemcpy(&ll, ptr, sizeof(unsigned long long), cudaMemcpyDeviceToHost);
+    ptr += sizeof(unsigned long long);
     w->o_proj = (half*)ptr;
     ptr += ll * sizeof(half);
-    cudaMemcpy(&ll, ptr, sizeof(int), cudaMemcpyDeviceToHost);
-    ptr += sizeof(int);
+    cudaMemcpy(&ll, ptr, sizeof(unsigned long long), cudaMemcpyDeviceToHost);
+    ptr += sizeof(unsigned long long);
     w->gate_proj = (half*)ptr;
     ptr += ll * sizeof(half);
-    cudaMemcpy(&ll, ptr, sizeof(int), cudaMemcpyDeviceToHost);
-    ptr += sizeof(int);
+    cudaMemcpy(&ll, ptr, sizeof(unsigned long long), cudaMemcpyDeviceToHost);
+    ptr += sizeof(unsigned long long);
     w->up_proj = (half*)ptr;
     ptr += ll * sizeof(half);
-    cudaMemcpy(&ll, ptr, sizeof(int), cudaMemcpyDeviceToHost);
-    ptr += sizeof(int);
+    cudaMemcpy(&ll, ptr, sizeof(unsigned long long), cudaMemcpyDeviceToHost);
+    ptr += sizeof(unsigned long long);
     w->down_proj = (half*)ptr;
     ptr += ll * sizeof(half);
-    cudaMemcpy(&ll, ptr, sizeof(int), cudaMemcpyDeviceToHost);
-    ptr += sizeof(int);
+    cudaMemcpy(&ll, ptr, sizeof(unsigned long long), cudaMemcpyDeviceToHost);
+    ptr += sizeof(unsigned long long);
     w->input_layernorm = (half*)ptr;
     ptr += ll * sizeof(half);
-    cudaMemcpy(&ll, ptr, sizeof(int), cudaMemcpyDeviceToHost);
-    ptr += sizeof(int);
+    cudaMemcpy(&ll, ptr, sizeof(unsigned long long), cudaMemcpyDeviceToHost);
+    ptr += sizeof(unsigned long long);
     w->post_attention_layernorm = (half*)ptr;
     ptr += ll * sizeof(half);
-    cudaMemcpy(&ll, ptr, sizeof(int), cudaMemcpyDeviceToHost);
-    ptr += sizeof(int);
+    cudaMemcpy(&ll, ptr, sizeof(unsigned long long), cudaMemcpyDeviceToHost);
+    ptr += sizeof(unsigned long long);
     w->norm = (half*)ptr;
     ptr += ll * sizeof(half);
-    cudaMemcpy(&ll, ptr, sizeof(int), cudaMemcpyDeviceToHost);
-    printf("++++++++++++--------%d\n", ll);
-    ptr += sizeof(int);
+    cudaMemcpy(&ll, ptr, sizeof(unsigned long long), cudaMemcpyDeviceToHost);
+    // printf("++++++++++++--------%llu\n", ll);
+    ptr += sizeof(unsigned long long);
     w->lm_head = (half*)ptr;
 }
 
@@ -392,7 +415,7 @@ void rope_forward(float *q, float rope_freq_constant, int batch, int q_heads, in
     int b = blockIdx.x;
     int h = blockIdx.y;
     int tid = threadIdx.x;
-    int lid = tid % WARP_THREADS;
+    // int lid = tid % WARP_THREADS;
 
     int offset = b * q_heads * head_dim + h * head_dim;
 
@@ -693,26 +716,27 @@ void* qwen2_forward(Context *ctx, Qwen2* qwen2, int *token, int batch, int pos) 
 
     int hidden_size = p->hidden_size;
     int intermediate_size = p->intermediate_size;
-    int max_position_embeddings = p->max_position_embeddings;
-    int max_window_layers = p->max_window_layers;
+    // int max_position_embeddings = p->max_position_embeddings;
+    // int max_window_layers = p->max_window_layers;
     int num_attention_heads = p->num_attention_heads;
     int num_hidden_layers = p->num_hidden_layers;
     int num_key_value_heads = p->num_key_value_heads;
     float rms_norm_eps = p->rms_norm_eps;
     float rope_theta = p->rope_theta;
-    int sliding_window = p->sliding_window;
+    // int sliding_window = p->sliding_window;
     int vocab_size = p->vocab_size;
 
-    int num_heads = p->num_attention_heads;
+    int num_heads = num_attention_heads;
     int head_dim = hidden_size / num_heads;
     
     // printf("qwen2_forward pos:%d, batch:%d, hidden_size:%d \n", pos, batch, hidden_size);
     cudaError_t err;
     
     get_content_row<<<dim3(batch, hidden_size/WARPGROUP_THREADS), WARPGROUP_THREADS>>>(x, w->embed_tokens, token, batch, hidden_size);
-    
-    // err = cudaGetLastError();
-    // printf("+++%s\n", cudaGetErrorName(err));
+    err = cudaGetLastError();
+    if (err != cudaSuccess) {
+        printf("%s\n", cudaGetErrorName(err));
+    }
 
     cudaDeviceSynchronize();
     // for(int l = 0; l < 1; l++) {
@@ -720,26 +744,26 @@ void* qwen2_forward(Context *ctx, Qwen2* qwen2, int *token, int batch, int pos) 
         // attn_norm
         rmsnorm_forward<<<dim3(batch, hidden_size / WARPGROUP_THREADS), WARPGROUP_THREADS>>>(s->xb, s->x, w->input_layernorm + l*hidden_size, rms_norm_eps, batch, hidden_size);
 
-        int offset_k = l * max_seq_len * num_heads * head_dim 
-                         + pos * num_heads * head_dim;
-        int offset_v = l * max_seq_len * num_heads * head_dim 
-                         + pos * num_heads * head_dim;
+        int offset_k = l * max_seq_len * num_key_value_heads * head_dim 
+                         + pos * num_key_value_heads * head_dim;
+        int offset_v = l * max_seq_len * num_key_value_heads * head_dim 
+                         + pos * num_key_value_heads * head_dim;
         s->k = s->key_cache + offset_k;
         s->v = s->value_cache + offset_v;
 
         // batch * p->num_hidden_layers * seq_len * num_heads * head_dim
 
         linear_forward<<<dim3(batch, num_heads * head_dim / WARPGROUP_THREADS), WARPGROUP_THREADS>>>(s->q, s->xb, w->q_proj_w + l * hidden_size * (num_heads * head_dim), w->q_proj_b + l * (num_heads * head_dim), batch, hidden_size, num_heads * head_dim);
-        linear_forward<<<dim3(batch, num_heads * head_dim / WARPGROUP_THREADS), WARPGROUP_THREADS>>>(s->k, s->xb, w->k_proj_w + l * hidden_size * (num_heads * head_dim), w->k_proj_b + l * (num_heads * head_dim), batch, hidden_size, num_heads * head_dim);
-        linear_forward<<<dim3(batch, num_heads * head_dim / WARPGROUP_THREADS), WARPGROUP_THREADS>>>(s->v, s->xb, w->v_proj_w + l * hidden_size * (num_heads * head_dim), w->v_proj_b + l * (num_heads * head_dim), batch, hidden_size, num_heads * head_dim);
+        linear_forward<<<dim3(batch, num_key_value_heads * head_dim / WARPGROUP_THREADS), WARPGROUP_THREADS>>>(s->k, s->xb, w->k_proj_w + l * hidden_size * (num_key_value_heads * head_dim), w->k_proj_b + l * (num_key_value_heads * head_dim), batch, hidden_size, num_key_value_heads * head_dim);
+        linear_forward<<<dim3(batch, num_key_value_heads * head_dim / WARPGROUP_THREADS), WARPGROUP_THREADS>>>(s->v, s->xb, w->v_proj_w + l * hidden_size * (num_key_value_heads * head_dim), w->v_proj_b + l * (num_key_value_heads * head_dim), batch, hidden_size, num_key_value_heads * head_dim);
         
         rope_forward<<<dim3(batch, num_heads), WARPGROUP_THREADS>>>(s->q, rope_theta, batch, num_heads, head_dim, pos);
 
-        rope_forward<<<dim3(batch, num_heads), WARPGROUP_THREADS>>>(s->k, rope_theta, batch, num_heads, head_dim, pos);
+        rope_forward<<<dim3(batch, num_key_value_heads), WARPGROUP_THREADS>>>(s->k, rope_theta, batch, num_heads, head_dim, pos);
 
         // group attention
         group_flash_attention_forward<<<dim3(batch, num_heads), WARPGROUP_THREADS>>>(s->xb, s->q, s->key_cache, s->value_cache, s->att,
-                             batch, num_heads, num_heads, head_dim, num_heads, num_heads, max_seq_len, 
+                             batch, num_heads, num_key_value_heads, head_dim, num_heads, num_key_value_heads, max_seq_len, 
                              num_hidden_layers, l, pos);
 
         linear_forward<<<dim3(batch, hidden_size / WARPGROUP_THREADS), WARPGROUP_THREADS>>>(s->xb2, s->xb, w->o_proj + l * (num_heads * head_dim) * hidden_size, NULL, batch, num_heads * head_dim, hidden_size);
@@ -763,7 +787,7 @@ void* qwen2_forward(Context *ctx, Qwen2* qwen2, int *token, int batch, int pos) 
 
     rmsnorm_forward<<<dim3(batch, hidden_size / WARPGROUP_THREADS), WARPGROUP_THREADS>>>(s->x, s->x, w->norm, rms_norm_eps, batch, hidden_size);
     
-    logits_forward<<<dim3(batch, p->vocab_size / WARPGROUP_THREADS), WARPGROUP_THREADS>>>(s->logits, s->x, w->lm_head, NULL, batch, hidden_size, p->vocab_size);
+    logits_forward<<<dim3(batch, vocab_size / WARPGROUP_THREADS), WARPGROUP_THREADS>>>(s->logits, s->x, w->lm_head, NULL, batch, hidden_size, vocab_size);
 
     return s->logits;
 }

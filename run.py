@@ -2,14 +2,14 @@
 nvcc --shared -Xcompiler -fPIC -o qwen2.so -O3 qwen2.cu -lm
 python run.py
 """
+import argparse
 import time
 from transformers import AutoTokenizer
 from ctypes import CDLL
 from ctypes import c_int, c_char_p, POINTER, create_string_buffer
 qwem2lib = CDLL("./qwen2.so")
 
-import sys
-sys.argv.append("-resize")
+
 def init(batch: int, max_seq_len: int, checkpoint_path: str):
     qwem2lib.c_init.argtypes = [c_int, c_int, c_char_p]
     checkpoint_path_buffer = create_string_buffer(checkpoint_path.encode("utf-8"))
@@ -24,8 +24,22 @@ def qwen2_forward(token, batch, seq_len, pos)->list:
     return res
 
 if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--model_type", type=str, default="Qwen/Qwen1.5-0.5B-Chat")
+    args = parser.parse_args()
+    model_type = args.model_type
+
+    model_file = "qwen1.5-14B.bin"
+    if model_type == "Qwen/Qwen1.5-0.5B-Chat":
+        model_file = "qwen1.5-0.5B.bin"
+    if model_type == "Qwen/Qwen1.5-1.8B-Chat":
+        model_file = "qwen1.5-1.8B.bin"
+    if model_type == "Qwen/Qwen1.5-4B-Chat":
+        model_file = "qwen1.5-4B.bin"
+    if model_type == "Qwen/Qwen1.5-14B-Chat":
+        model_file = "qwen1.5-14B.bin"
     device = "cuda"
-    tokenizer = AutoTokenizer.from_pretrained("Qwen/Qwen1.5-0.5B-Chat")
+    tokenizer = AutoTokenizer.from_pretrained(model_type)
 
     prompt = "Give me a short introduction to large language model."
     messages = [
@@ -47,8 +61,8 @@ if __name__ == '__main__':
     batch = 1
     max_seq_len = 256
     pos = 0
-    # init(batch, max_seq_len, "qwen1.5-0.5B.bin")
-    init(batch, max_seq_len, "qwen1.5-1.8B.bin")
+    init(batch, max_seq_len, "qwen1.5-0.5B.bin")
+    # init(batch, max_seq_len, "qwen1.5-1.8B.bin")
 
     output = []
     begin = time.time()
