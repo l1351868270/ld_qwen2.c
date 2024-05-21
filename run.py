@@ -24,8 +24,12 @@ def qwen2_forward(token, batch, seq_len, pos)->list:
     return res
 
 if __name__ == '__main__':
+    # python run.py --model_type=Qwen/Qwen1.5-0.5B-Chat --prompt="Give me a short introduction to large language model."
+    # python run.py --model_type=Qwen/Qwen1.5-4B-Chat --prompt="Give me a short introduction to large language model."
+    # python run.py --model_type=Qwen/Qwen1.5-14B-Chat --prompt="Give me a short introduction to large language model."
     parser = argparse.ArgumentParser()
     parser.add_argument("--model_type", type=str, default="Qwen/Qwen1.5-0.5B-Chat")
+    parser.add_argument("--prompt", type=str, default="Give me a short introduction to large language model.")
     args = parser.parse_args()
     model_type = args.model_type
 
@@ -38,10 +42,10 @@ if __name__ == '__main__':
         model_file = "qwen1.5-4B.bin"
     if model_type == "Qwen/Qwen1.5-14B-Chat":
         model_file = "qwen1.5-14B.bin"
-    device = "cuda"
+    device = "cpu"
     tokenizer = AutoTokenizer.from_pretrained(model_type)
 
-    prompt = "Give me a short introduction to large language model."
+    prompt = args.prompt
     messages = [
         {"role": "system", "content": "You are a helpful assistant."},
         {"role": "user", "content": prompt}
@@ -61,8 +65,7 @@ if __name__ == '__main__':
     batch = 1
     max_seq_len = 256
     pos = 0
-    init(batch, max_seq_len, "qwen1.5-0.5B.bin")
-    # init(batch, max_seq_len, "qwen1.5-1.8B.bin")
+    init(batch, max_seq_len, model_file)
 
     output = []
     begin = time.time()

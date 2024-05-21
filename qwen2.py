@@ -60,15 +60,15 @@ def generate(model, tokenizer, tokenized_prompt, steps):
         # print(inputs_embeds.dtype)
         # print(inputs_embeds)
         hidden_states = inputs_embeds
-        for layer_idx, decoder_layer in enumerate(model.model.layers[:]):
+        for layer_idx, decoder_layer in enumerate(model.model.layers[:1]):
             residual = hidden_states
             hidden_states = decoder_layer.input_layernorm(hidden_states)
             # print(hidden_states.shape)
             # print(hidden_states)
            
             query_states = decoder_layer.self_attn.q_proj(hidden_states)
-            # print(query_states.shape)
-            # print(query_states)
+            print(query_states.shape)
+            print(query_states)
             key_states = decoder_layer.self_attn.k_proj(hidden_states)
             # print(key_states.shape)
             # print(key_states)
@@ -135,7 +135,7 @@ def generate(model, tokenizer, tokenized_prompt, steps):
         # print(hidden_states.shape)
         # print(hidden_states)
         logits = model.lm_head(hidden_states)
-        print(logits)
+        # print(logits)
         pos += 1
 
 def generate1(model, tokenizer, tokenized_prompt, steps):
@@ -185,5 +185,5 @@ if __name__ == "__main__":
     tokenized_prompt = model_inputs.flatten().tolist()
     seq_len = len(tokenized_prompt)
     steps = seq_len + 1
-    # generate(model, tokenizer, tokenized_prompt, steps)
-    generate1(model, tokenizer, tokenized_prompt, steps)
+    generate(model, tokenizer, tokenized_prompt, steps)
+    # generate1(model, tokenizer, tokenized_prompt, steps)

@@ -8,3 +8,8 @@
 *.so
 *.log
 .vscode
+*.nsys-rep
+*.sqlite
+test*
+
+qwen2_q80.cu
