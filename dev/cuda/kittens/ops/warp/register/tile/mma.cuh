@@ -98,6 +98,35 @@ __device__ static inline void hmma16816(      half_2 &d0,       half_2 &d1,
         "r"(*(uint32_t*)(&c0)), "r"(*(uint32_t*)(&c1))
     );
 }
+
+__device__ static inline void hmma16816(      float2 &d0,       float2 &d1,
+                                        const half_2 &a0, const half_2 &a1, const half_2 &a2, const half_2 &a3,
+                                        const half_2 &b0, const half_2 &b1,
+                                        const float2 &c0, const float2 &c1                                    ) {
+    asm volatile(
+        // https://docs.nvidia.com/cuda/parallel-thread-execution/index.html#multiply-and-accumulate-instruction-mma
+        "mma.sync.aligned.m16n8k16.row.col.f32.f16.f16.f32 " \
+        "{%0, %1, %2, %3}, " \
+        "{%4, %5, %6, %7}, " \
+        "{%8, %9}, " \
+        "{%10, %11, %12, %13};"
+
+        // D matrix
+    :   "+f"(d0.x), "+f"(d0.y),
+        "+f"(d1.x), "+f"(d1.y)
+
+        // A matrix
+    :   "r"(*(uint32_t*)(&a0)), "r"(*(uint32_t*)(&a1)),
+        "r"(*(uint32_t*)(&a2)), "r"(*(uint32_t*)(&a3)),
+
+        // B matrix
+        "r"(*(uint32_t*)(&b0)), "r"(*(uint32_t*)(&b1)),
+
+        // C matrix
+        "f"(c0.x), "f"(c0.y),
+        "f"(c1.x), "f"(c1.y)
+    );
+}
 /**
  * @brief Base matrix multiply-accumulate operation for row layout.
  *
@@ -154,6 +183,25 @@ __device__ static inline void mma_AB_base(rt_base<half_2, ducks::rt_layout::row>
         c.data[2], c.data[3]
     );
 }
+
+__device__ static inline void mma_AB_base(rt_base<float2, ducks::rt_layout::row> &d,
+                                    const rt_base<half_2, ducks::rt_layout::row> &a,
+                                    const rt_base<half_2, ducks::rt_layout::col> &b, // in col-major mode
+                                    const rt_base<float2, ducks::rt_layout::row> &c) {
+    hmma16816(
+        d.data[0], d.data[1],
+        a.data[0], a.data[1], a.data[2], a.data[3],
+        b.data[0], b.data[2],
+        c.data[0], c.data[1]
+    );
+    hmma16816(
+        d.data[2], d.data[3],
+        a.data[0], a.data[1], a.data[2], a.data[3],
+        b.data[1], b.data[3],
+        c.data[2], c.data[3]
+    );
+}
+
 /**
  * @brief Base dot product operation for row layout.
  *
@@ -182,6 +230,25 @@ __device__ static inline void mma_ABt_base(rt_base<float2, ducks::rt_layout::row
         c.data[2], c.data[3]
     );
 }
+
+__device__ static inline void mma_ABt_base(rt_base<float2, ducks::rt_layout::row> &d,
+                                     const rt_base<half_2, ducks::rt_layout::row> &a,
+                                     const rt_base<half_2, ducks::rt_layout::row> &b, // in row-major mode
+                                     const rt_base<float2, ducks::rt_layout::row> &c) {
+    hmma16816(
+        d.data[0], d.data[1],
+        a.data[0], a.data[1], a.data[2], a.data[3],
+        b.data[0], b.data[2], // for some reason this one seems to need to be backwards
+        c.data[0], c.data[1]
+    );
+    hmma16816(
+        d.data[2], d.data[3],
+        a.data[0], a.data[1], a.data[2], a.data[3],
+        b.data[1], b.data[3], // for some reason this one seems to need to be backwards
+        c.data[2], c.data[3]
+    );
+}
+
 /**
  * @brief Base matrix multiply-accumulate operation for row layout with transposed A.
  *
@@ -321,6 +388,35 @@ __device__ static inline void mma_AB(rt_fl<N, M, ducks::rt_layout::row> &d,
         }
     }
 }
+
+template<int N, int K, int M>
+__device__ static inline void mma_AB(rt_fl<N, M, ducks::rt_layout::row> &d,
+                               const rt_hf<N, K, ducks::rt_layout::row> &a,
+                               const rt_hf<K, M, ducks::rt_layout::col> &b,
+                               const rt_fl<N, M, ducks::rt_layout::row> &c) {
+    #pragma unroll
+    for(int n = 0; n < N; n++) {
+        #pragma unroll
+        for(int m = 0; m < M; m++) {
+            mma_AB_base(
+                d.tiles[n][m],
+                a.tiles[n][0],
+                b.tiles[0][m],
+                c.tiles[n][m]
+            );
+            #pragma unroll
+            for(int k = 1; k < K; k++) {
+                mma_AB_base(
+                    d.tiles[n][m],
+                    a.tiles[n][k],
+                    b.tiles[k][m],
+                    d.tiles[n][m]
+                );
+            }
+        }
+    }
+}
+
 /**
  * @brief Dot product operation for row layout.
  *
@@ -362,6 +458,35 @@ __device__ static inline void mma_ABt(rt_fl<N, M, ducks::rt_layout::row> &d,
         }
     }
 }
+
+template<int N, int K, int M>
+__device__ static inline void mma_ABt(rt_fl<N, M, ducks::rt_layout::row> &d,
+                                const rt_hf<N, K, ducks::rt_layout::row> &a,
+                                const rt_hf<M, K, ducks::rt_layout::row> &b, // notice row and (M, K) instead of col and (K, M)
+                                const rt_fl<N, M, ducks::rt_layout::row> &c) {
+    #pragma unroll
+    for(int n = 0; n < N; n++) {
+        #pragma unroll
+        for(int m = 0; m < M; m++) {
+            mma_ABt_base(
+                d.tiles[n][m],
+                a.tiles[n][0],
+                b.tiles[m][0],
+                c.tiles[n][m]
+            );
+            #pragma unroll
+            for(int k = 1; k < K; k++) {
+                mma_ABt_base(
+                    d.tiles[n][m],
+                    a.tiles[n][k],
+                    b.tiles[m][k],
+                    d.tiles[n][m]
+                );
+            }
+        }
+    }
+}
+
 /**
  * @brief Matrix multiply-accumulate operation with transposed A.
  *

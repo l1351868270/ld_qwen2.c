@@ -72,50 +72,114 @@ namespace detail {
  * @param c[in] The column position.
  * @return The calculated index.
  */
-template<int height, int width, ducks::st_layout::all T=ducks::st_layout::naive>
+// template<int height, int width, ducks::st_layout::all T=ducks::st_layout::naive>
+// struct shared_indexer {
+//     static constexpr int rows = height*16;
+//     static constexpr int cols = width*16;
+//     /**
+//      * @brief Get a memory offset from a row and column index.
+//      */
+//     __device__ static inline bf16* idx(bf16 *ptr, int r, int c) { // naive row-major index default
+//         return &ptr[r*cols + c];
+//     }
+// };
+// template<int height, int width>
+// struct shared_indexer<height, width, ducks::st_layout::swizzle> {
+//     static constexpr int rows = height*16;
+//     static constexpr int cols = width*16;
+//     static constexpr int swizzle_repeat = (width%4==0) ? 1024 : (width%2==0) ? 512 : 256;
+//     static constexpr int swizzle_shift = (width%4==0) ? 6 : (width%2==0) ? 5 : 4;
+//     __device__ static inline bf16* idx(bf16 *ptr, int r, int c) { // naive row-major index default
+//         const uint64_t addr = (uint64_t)(&ptr[r*cols + c]);
+//         const int swizzle = ((addr % swizzle_repeat) >> 7) << 4;
+//         return (bf16*)(addr ^ swizzle);
+//     }
+// };
+// template<int height, int width>
+// struct shared_indexer<height, width, ducks::st_layout::wgmma_swizzle> {
+//     static constexpr int rows = height*16;
+//     static constexpr int cols = width*16;
+//     static constexpr int swizzle_repeat = (width%4==0) ? 1024 : (width%2==0) ? 512 : 256;
+//     static constexpr int swizzle_shift = (width%4==0) ? 6 : (width%2==0) ? 5 : 4;
+//     static constexpr int subtile_cols = (width%4==0) ? 64 : (width%2==0) ? 32 : 16;
+//     __device__ static inline bf16* idx(bf16 *ptr, int r, int c) { // naive row-major index default
+//         const int outer_idx = c/subtile_cols;
+//         const uint64_t addr = (uint64_t)(&ptr[outer_idx*rows*subtile_cols + r*subtile_cols + c%subtile_cols]);
+//         const int swizzle = ((addr % swizzle_repeat) >> 7) << 4;
+//         return (bf16*)(addr ^ swizzle);
+//     }
+// };
+// template<int height, int width>
+// struct shared_indexer<height, width, ducks::st_layout::wgmma_interleave> {
+//     static constexpr int rows = height*16;
+//     static constexpr int cols = width*16;
+//     static constexpr int rows_per_core_matrix = 8;
+//     static constexpr int cols_per_core_matrix = 8;
+//     __device__ static inline bf16* idx(bf16 *ptr, int r, int c) { // naive row-major index default
+//         int idx1 = r/rows_per_core_matrix;
+//         int idx2 = c/cols_per_core_matrix;
+//         int idx3 = (r%rows_per_core_matrix);
+//         int idx4 = (c%cols_per_core_matrix);
+//         return &ptr[(
+//             (
+//                 (
+//                     idx1 * (2*width) // width is in units of 16, but we want units of 8
+//                     + idx2
+//                 ) * 8 // * 8 rows per tensormap
+//                 + idx3
+//             ) * 8 // * 8 columns per row
+//             + idx4
+//         )];
+//     }
+// };
+
+
+
+
+template<typename dtype, int height, int width, ducks::st_layout::all T=ducks::st_layout::naive>
 struct shared_indexer {
     static constexpr int rows = height*16;
     static constexpr int cols = width*16;
     /**
      * @brief Get a memory offset from a row and column index.
      */
-    __device__ static inline bf16* idx(bf16 *ptr, int r, int c) { // naive row-major index default
+    __device__ static inline dtype* idx(dtype *ptr, int r, int c) { // naive row-major index default
         return &ptr[r*cols + c];
     }
 };
-template<int height, int width>
-struct shared_indexer<height, width, ducks::st_layout::swizzle> {
+template<typename dtype, int height, int width>
+struct shared_indexer<dtype, height, width, ducks::st_layout::swizzle> {
     static constexpr int rows = height*16;
     static constexpr int cols = width*16;
     static constexpr int swizzle_repeat = (width%4==0) ? 1024 : (width%2==0) ? 512 : 256;
     static constexpr int swizzle_shift = (width%4==0) ? 6 : (width%2==0) ? 5 : 4;
-    __device__ static inline bf16* idx(bf16 *ptr, int r, int c) { // naive row-major index default
+    __device__ static inline dtype* idx(dtype *ptr, int r, int c) { // naive row-major index default
         const uint64_t addr = (uint64_t)(&ptr[r*cols + c]);
         const int swizzle = ((addr % swizzle_repeat) >> 7) << 4;
-        return (bf16*)(addr ^ swizzle);
+        return (dtype*)(addr ^ swizzle);
     }
 };
-template<int height, int width>
-struct shared_indexer<height, width, ducks::st_layout::wgmma_swizzle> {
+template<typename dtype, int height, int width>
+struct shared_indexer<dtype, height, width, ducks::st_layout::wgmma_swizzle> {
     static constexpr int rows = height*16;
     static constexpr int cols = width*16;
     static constexpr int swizzle_repeat = (width%4==0) ? 1024 : (width%2==0) ? 512 : 256;
     static constexpr int swizzle_shift = (width%4==0) ? 6 : (width%2==0) ? 5 : 4;
     static constexpr int subtile_cols = (width%4==0) ? 64 : (width%2==0) ? 32 : 16;
-    __device__ static inline bf16* idx(bf16 *ptr, int r, int c) { // naive row-major index default
+    __device__ static inline dtype* idx(dtype *ptr, int r, int c) { // naive row-major index default
         const int outer_idx = c/subtile_cols;
         const uint64_t addr = (uint64_t)(&ptr[outer_idx*rows*subtile_cols + r*subtile_cols + c%subtile_cols]);
         const int swizzle = ((addr % swizzle_repeat) >> 7) << 4;
-        return (bf16*)(addr ^ swizzle);
+        return (dtype*)(addr ^ swizzle);
     }
 };
-template<int height, int width>
-struct shared_indexer<height, width, ducks::st_layout::wgmma_interleave> {
+template<typename dtype, int height, int width>
+struct shared_indexer<dtype, height, width, ducks::st_layout::wgmma_interleave> {
     static constexpr int rows = height*16;
     static constexpr int cols = width*16;
     static constexpr int rows_per_core_matrix = 8;
     static constexpr int cols_per_core_matrix = 8;
-    __device__ static inline bf16* idx(bf16 *ptr, int r, int c) { // naive row-major index default
+    __device__ static inline dtype* idx(dtype *ptr, int r, int c) { // naive row-major index default
         int idx1 = r/rows_per_core_matrix;
         int idx2 = c/cols_per_core_matrix;
         int idx3 = (r%rows_per_core_matrix);

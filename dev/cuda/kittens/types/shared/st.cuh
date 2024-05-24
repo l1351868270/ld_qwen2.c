@@ -89,10 +89,10 @@ struct KITTENS_DEFAULT_ALIGN st {
      * indexing calculations for swizzled or strangely ordered layouts.
      */
     __device__ inline       dtype& operator[](const int2 &rowcol)       {
-        return *detail::shared_indexer<height, width, layout>::idx(data, rowcol.x, rowcol.y);
+        return *detail::shared_indexer<dtype, height, width, layout>::idx(data, rowcol.x, rowcol.y);
     }
     __device__ inline const dtype& operator[](const int2 &rowcol) const {
-        return *(const bf16*)detail::shared_indexer<height, width, layout>::idx((bf16*)data, rowcol.x, rowcol.y);
+        return *(const dtype*)detail::shared_indexer<dtype, height, width, layout>::idx((dtype*)data, rowcol.x, rowcol.y);
     }
     __device__ inline       dtype& operator[](int idx)       {
         return data[idx];
@@ -156,13 +156,13 @@ struct st_subtile {
     }
 
     __device__ inline       dtype& operator[](const int2 &rowcol)       {
-        return *detail::shared_indexer<underlying_height, underlying_width, layout>::idx(
-            (bf16*)data, rowcol.x+row_offset, rowcol.y+col_offset
+        return *detail::shared_indexer<dtype, underlying_height, underlying_width, layout>::idx(
+            (dtype*)data, rowcol.x+row_offset, rowcol.y+col_offset
         );
     }
     __device__ inline const dtype& operator[](const int2 &rowcol) const {
-        return *(const bf16*)detail::shared_indexer<underlying_height, underlying_width, layout>::idx(
-            (bf16*)data, rowcol.x+row_offset, rowcol.y+col_offset
+        return *(const dtype*)detail::shared_indexer<dtype, underlying_height, underlying_width, layout>::idx(
+            (dtype*)data, rowcol.x+row_offset, rowcol.y+col_offset
         );
     }
 
@@ -196,6 +196,8 @@ template<typename T> concept all = requires {
 /* ----------  WRAPPERS FOR PRETTINESS  ---------- */
 
 template<int _height, int _width, ducks::st_layout::all layout=ducks::st_layout::swizzle> using st_bf = st<bf16, _height, _width, layout>; // prelim tests indicate this is fastest default
+template<int _height, int _width, ducks::st_layout::all layout=ducks::st_layout::swizzle> using st_hf = st<half, _height, _width, layout>;
+template<int _height, int _width, ducks::st_layout::all layout=ducks::st_layout::swizzle> using st_fl = st<float, _height, _width, layout>;
 
 template<ducks::st_layout::all layout=ducks::st_layout::swizzle> using st_bf_1x1 = st_bf<1, 1, layout>;
 template<ducks::st_layout::all layout=ducks::st_layout::swizzle> using st_bf_1x2 = st_bf<1, 2, layout>;

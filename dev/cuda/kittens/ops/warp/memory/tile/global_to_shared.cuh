@@ -46,6 +46,33 @@ __device__ static inline void load(ST &dst, const bf16 *src, const int row_strid
         *(float4*)(&dst[{row, col}]) = *(float4*)(&src[row*row_stride + col]);
     }
 }
+
+
+template<ducks::st::all ST>
+__device__ static inline void load(ST &dst, const half *src, const int row_stride) {
+    // each thread needs to do 1 call per width*height
+    // attempting to improve striping into dram
+    // each lane of the warp should store sequential into dram
+
+    int laneid = threadIdx.x % 32;
+
+    // we can handle this many rows each time we run a memcpy_async
+    int elem_per_memcpy = sizeof(float4)/sizeof(half);
+    int memcpy_per_row = dst.cols / elem_per_memcpy;
+    int total_calls = dst.height * dst.width;
+
+    #pragma unroll
+    for(int i = 0; i < total_calls; i++) {
+
+        int idx = i * 32 + laneid;
+        
+        int row = idx / memcpy_per_row;
+        int col = (idx*elem_per_memcpy) % dst.cols;
+
+        *(float4*)(&dst[{row, col}]) = *(float4*)(&src[row*row_stride + col]);
+    }
+}
+
 /**
  * @brief Stores bf16 data from a shared memory tile with a row layout into global memory.
  *
@@ -116,6 +143,37 @@ __device__ static inline void load_async(ST &dst, const bf16 *src, const int row
         );
     }
 }
+
+template<ducks::st::all ST>
+__device__ static inline void load_async(ST &dst, const half *src, const int row_stride, cuda::barrier<cuda::thread_scope_block> &barrier) {
+    // each thread needs to do 1 call per width*height
+    // attempting to improve striping into dram
+    // each lane of the warp should store sequential into dram
+
+    int laneid = threadIdx.x % 32;
+
+    // we can handle this many rows each time we run a memcpy_async
+    int elem_per_memcpy = sizeof(float4)/sizeof(half);
+    int memcpy_per_row = dst.cols / elem_per_memcpy;
+    int total_calls = dst.height * dst.width;
+
+    #pragma unroll
+    for(int i = 0; i < total_calls; i++) {
+
+        int idx = i * 32 + laneid;
+        
+        int row = idx / memcpy_per_row;
+        int col = (idx*elem_per_memcpy) % dst.cols;
+
+        cuda::memcpy_async(
+            (void*)(&dst[{row, col}]),
+            (void*)(&src[row*row_stride + col]),
+            cuda::aligned_size_t<16>(sizeof(float4)),
+            barrier
+        );
+    }
+}
+
 /**
  * @brief Asynchronously stores bf16 data from a shared memory tile with a row layout into global memory using CUDA barriers.
  *
@@ -154,6 +212,44 @@ __device__ static inline void store_async(bf16 *dst, const ST &src, const int ro
             cuda::aligned_size_t<16>(sizeof(float4)),
             barrier
         );
+    }
+}
+
+template<ducks::st::all ST>
+__device__ static inline void store_async(float *dst, const ST &src, const int row_stride, cuda::barrier<cuda::thread_scope_block> &barrier) {
+    // each thread needs to do 1 call per width*height
+    // attempting to improve striping into dram
+    // each lane of the warp should store sequential into dram
+
+    int laneid = threadIdx.x % 32;
+
+    // we can handle this many rows each time we run a memcpy_async
+    int elem_per_memcpy = sizeof(float4)/sizeof(float);
+    int memcpy_per_row = src.cols / elem_per_memcpy;
+    int total_calls = src.height * src.width;
+
+    #pragma unroll
+    for(int i = 0; i < total_calls; i++) {
+
+        int idx = i * 32 + laneid;
+        
+        int row = idx / memcpy_per_row;
+        int col = (idx*elem_per_memcpy) % src.cols;
+
+        cuda::memcpy_async(
+            (void*)(&dst[row*row_stride + col]),
+            (void*)(&src[{row, col}]),
+            cuda::aligned_size_t<16>(sizeof(float4)),
+            barrier
+        );
+
+        cuda::memcpy_async(
+            (void*)(&dst[(row+8)*row_stride + col]),
+            (void*)(&src[{row+8, col}]),
+            cuda::aligned_size_t<16>(sizeof(float4)),
+            barrier
+        );
+
     }
 }
 
