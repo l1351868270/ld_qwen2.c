@@ -12,6 +12,7 @@ def load_csv_and_stat(path):
         'ampere_h16816gemm_128x64_ldg8_stages_32x6_tn',
         "ampere_h1688gemm_256x64_ldg8_stages_32x1_tn",
         "cutlass_80_tensorop_s16816gemm_f16_64x64_32x6_tn_align8",
+        "internal::gemvx::kernel",
         'simple_gemm_tt',
     ])
     for line in lines:
