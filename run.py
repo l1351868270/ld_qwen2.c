@@ -4,20 +4,22 @@ python run.py
 """
 import argparse
 import time
+import os
 from transformers import AutoTokenizer
 from ctypes import CDLL
 from ctypes import c_int, c_char_p, POINTER, create_string_buffer
-qwem2lib = CDLL("./qwen2.so")
 
+qwen2_path = os.path.dirname(os.path.abspath(__file__))
+qwen2lib = CDLL(os.path.join(qwen2_path, "./qwen2.so"))
 
 def init(batch: int, max_seq_len: int, checkpoint_path: str):
-    qwem2lib.c_init.argtypes = [c_int, c_int, c_char_p]
+    qwen2lib.c_init.argtypes = [c_int, c_int, c_char_p]
     checkpoint_path_buffer = create_string_buffer(checkpoint_path.encode("utf-8"))
-    qwem2lib.c_init(c_int(batch), c_int(max_seq_len), checkpoint_path_buffer)
+    qwen2lib.c_init(c_int(batch), c_int(max_seq_len), checkpoint_path_buffer)
 
 def qwen2_forward(token, batch, seq_len, pos)->list:
-    qwem2lib.c_qwen2_forward.restype = POINTER(c_int * batch)
-    sample = qwem2lib.c_qwen2_forward(c_int(batch), c_int(seq_len), (c_int * len(token))(*token), c_int(pos)) 
+    qwen2lib.c_qwen2_forward.restype = POINTER(c_int * batch)
+    sample = qwen2lib.c_qwen2_forward(c_int(batch), c_int(seq_len), (c_int * len(token))(*token), c_int(pos)) 
     res = []
     for i in sample.contents:
         res.append(int(i))
@@ -25,6 +27,7 @@ def qwen2_forward(token, batch, seq_len, pos)->list:
 
 if __name__ == '__main__':
     # python run.py --model_type=Qwen/Qwen1.5-0.5B-Chat --prompt="Give me a short introduction to large language model."
+    # python run.py --model_type=Qwen/Qwen1.5-1.8B-Chat --prompt="Give me a short introduction to large language model."
     # python run.py --model_type=Qwen/Qwen1.5-4B-Chat --prompt="Give me a short introduction to large language model."
     # python run.py --model_type=Qwen/Qwen1.5-14B-Chat --prompt="Give me a short introduction to large language model."
     parser = argparse.ArgumentParser()
@@ -35,13 +38,13 @@ if __name__ == '__main__':
 
     model_file = "qwen1.5-14B.bin"
     if model_type == "Qwen/Qwen1.5-0.5B-Chat":
-        model_file = "qwen1.5-0.5B.bin"
+        model_file = os.path.join(qwen2_path, "qwen1.5-0.5B.bin")
     if model_type == "Qwen/Qwen1.5-1.8B-Chat":
-        model_file = "qwen1.5-1.8B.bin"
+        model_file = os.path.join(qwen2_path, "qwen1.5-1.8B.bin")
     if model_type == "Qwen/Qwen1.5-4B-Chat":
-        model_file = "qwen1.5-4B.bin"
+        model_file = os.path.join(qwen2_path, "qwen1.5-4B.bin")
     if model_type == "Qwen/Qwen1.5-14B-Chat":
-        model_file = "qwen1.5-14B.bin"
+        model_file = os.path.join(qwen2_path, "qwen1.5-14B.bin")
     device = "cpu"
     tokenizer = AutoTokenizer.from_pretrained(model_type)
 

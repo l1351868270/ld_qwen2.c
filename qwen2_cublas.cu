@@ -1,6 +1,6 @@
 /*
 nvcc --shared -Xcompiler -fPIC -o qwen2.so -O3 qwen2_v1.cu -lm -lcublas -lcublasLt -gencode arch=compute_80,code=sm_80 -gencode arch=compute_86,code=sm_86
-python run.py --model_type=Qwen/Qwen1.5-4B-Chat --prompt="天空为什么是蓝色的,答案大于1000字"
+python run.py --model_type=Qwen/Qwen1.5-1.8B-Chat --prompt="天空为什么是蓝色的,答案大于1000字"
 */
 
 #include <time.h>
