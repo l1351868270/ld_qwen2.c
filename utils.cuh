@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+namespace ld_qwen2{
 #define CudaCheckError()    __cudaCheckError( __FILE__, __LINE__ )
 inline void __cudaCheckError( const char *file, const int line ) {
     cudaError err = cudaGetLastError();
@@ -21,3 +22,4 @@ inline void __cudaCheckError( const char *file, const int line ) {
         exit( -1 );
     }
 }
+} // namespace ld_qwen2

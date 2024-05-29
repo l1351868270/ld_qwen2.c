@@ -479,74 +479,11 @@ void rmsnorm_forward(float* o, float* x, half *weight, float rms_norm_eps, int b
     // }
 }
 
-// // https://pytorch.org/docs/stable/generated/torch.nn.Linear.html
-// __global__
-// void linear_forward(float* output, float* input, half *weight, half* bias, int batch, int in_features, int out_features) {
-//     int bidy = blockIdx.y;
-//     int tid = threadIdx.x;
-//     int warpid = tid / WARP_THREADS;
-//     int laneid = tid % WARP_THREADS;
-//     int num_per_thread = in_features / WARP_THREADS;
-//     int col = laneid * num_per_thread;
-//     int row = bidy * WARPGROUP_WARPS + warpid;
-
-//     float4* input4 = reinterpret_cast<float4*>(input + col);
-//     float4* weight4 = reinterpret_cast<float4*>(weight + row * in_features + col);
-
-//     float ss = 0.0f;
-
-//     for (int i = 0; i < (num_per_thread >> 3); i++) {
-//         float4 a = input4[2 * i];
-//         float4 b = weight4[i];
-//         half2* b_0 = reinterpret_cast<half2*>(&b.x);
-//         half2* b_1 = reinterpret_cast<half2*>(&b.y);
-//         half2* b_2 = reinterpret_cast<half2*>(&b.z);
-//         half2* b_3 = reinterpret_cast<half2*>(&b.w);
-
-//         ss += a.x * __half2float(b_0->x);
-//         ss += a.y * __half2float(b_0->y);
-//         ss += a.z * __half2float(b_1->x);
-//         ss += a.w * __half2float(b_1->y);
-//         float4 c = input4[2 * i + 1];
-//         ss += c.x * __half2float(b_2->x);
-//         ss += c.y * __half2float(b_2->y);
-//         ss += c.z * __half2float(b_3->x);
-//         ss += c.w * __half2float(b_3->y);
-//     }
-
-//     ss += __shfl_down_sync(0xffffffff, ss, 16);
-//     ss += __shfl_down_sync(0xffffffff, ss, 8);
-//     ss += __shfl_down_sync(0xffffffff, ss, 4);
-//     ss += __shfl_down_sync(0xffffffff, ss, 2);
-//     ss += __shfl_down_sync(0xffffffff, ss, 1);
-
-//     if (laneid == 0) {
-//         output[row] = ss;
-//     }
-                
-//     if (bias != NULL) {
-//         output[row] += __half2float(bias[row]);
-//     } 
-
-//     // if (thread0()) {
-//     //     printf("linear:\n");
-//     //     for (int b = 0; b < batch; b++) {
-//     //         printf("[");
-//     //         for (int i = 0; i < out_features; i++) {
-//     //             printf("%f, ", output[b * out_features + i]);
-//     //         }
-//     //         printf("]\n");
-//     //     }
-//     //     printf("]\n");
-//     // }
-// }
-
 // https://pytorch.org/docs/stable/generated/torch.nn.Linear.html
 __global__
 void linear_forward(float* output, float* input, half *weight, half* bias, int batch, int in_features, int out_features) {
     int bidy = blockIdx.y;
     int tid = threadIdx.x;
-    int warpid = tid / WARP_THREADS;
     int laneid = tid % WARP_THREADS;
     int num_per_thread = in_features / WARP_THREADS;
     // int col = laneid * num_per_thread;
@@ -1005,7 +942,7 @@ Qwen2 py_model;
 void c_init(int batch, int max_seq_len, const char *checkpoint_path) {
     printf("checkpoint_path: %s\n", checkpoint_path);
     if (checkpoint_path == NULL) {
-        checkpoint_path = "qwen1.5-0.5B_v1.bin";
+        checkpoint_path = "qwen1.5-0.5B.bin";
     }
     // const char *checkpoint_path = "qwen1.5-0.5B.bin";
     qwen2_build_from_checkpoint(&py_model, checkpoint_path);

@@ -21,6 +21,7 @@ extern "C" {
     // void c_chat ();
 }
 
+constexpr int MODEL_LIANMENT{16};
 constexpr int WARP_THREADS{32};
 constexpr int WARPGROUP_THREADS{128};
 
@@ -151,70 +152,128 @@ void free_run_state(RunState* s) {
     free(s->next_cpu);
 }
 
+
 void memory_map_weights(Qwen2Weights *w, Qwen2Config* p, char* ptr) {
     unsigned long long ll;
+    unsigned long long ll_bytes;;
     cudaMemcpy(&ll, ptr, sizeof(unsigned long long), cudaMemcpyDeviceToHost);
-    // printf("++++++++++++--------%llu\n", ll);
     ptr += sizeof(unsigned long long);
+    cudaMemcpy(&ll_bytes, ptr, sizeof(unsigned long long), cudaMemcpyDeviceToHost);
+    ptr += sizeof(unsigned long long);
+    // printf("++++++++++++--------%llu\n", ll);
+    // printf("++++++++++++--------%llu\n", ll_bytes);
     w->embed_tokens = (half*)ptr;
-    ptr += ll * sizeof(half);
+    ptr += ll_bytes;
     cudaMemcpy(&ll, ptr, sizeof(unsigned long long), cudaMemcpyDeviceToHost);
-    // printf("++++++++++++--------%llu\n", ll);
     ptr += sizeof(unsigned long long);
+    cudaMemcpy(&ll_bytes, ptr, sizeof(unsigned long long), cudaMemcpyDeviceToHost);
+    ptr += sizeof(unsigned long long);
+    // printf("++++++++++++--------%llu\n", ll);
+    // printf("++++++++++++--------%llu\n", ll_bytes);
     w->q_proj_w = (half*)ptr;
-    ptr += ll * sizeof(half);
+    ptr += ll_bytes;
     cudaMemcpy(&ll, ptr, sizeof(unsigned long long), cudaMemcpyDeviceToHost);
+    ptr += sizeof(unsigned long long);
+    cudaMemcpy(&ll_bytes, ptr, sizeof(unsigned long long), cudaMemcpyDeviceToHost);
     ptr += sizeof(unsigned long long);
     // printf("++++++++++++--------%llu\n", ll);
+    // printf("++++++++++++--------%llu\n", ll_bytes);
     w->q_proj_b = (half*)ptr;
-    ptr += ll * sizeof(half);
+    ptr += ll_bytes;
     cudaMemcpy(&ll, ptr, sizeof(unsigned long long), cudaMemcpyDeviceToHost);
     ptr += sizeof(unsigned long long);
+    cudaMemcpy(&ll_bytes, ptr, sizeof(unsigned long long), cudaMemcpyDeviceToHost);
+    ptr += sizeof(unsigned long long);
+    // printf("++++++++++++--------%llu\n", ll);
+    // printf("++++++++++++--------%llu\n", ll_bytes);
     w->k_proj_w = (half*)ptr;
     ptr += ll * sizeof(half);
     cudaMemcpy(&ll, ptr, sizeof(unsigned long long), cudaMemcpyDeviceToHost);
     ptr += sizeof(unsigned long long);
+    cudaMemcpy(&ll_bytes, ptr, sizeof(unsigned long long), cudaMemcpyDeviceToHost);
+    ptr += sizeof(unsigned long long);
+    // printf("++++++++++++--------%llu\n", ll);
+    // printf("++++++++++++--------%llu\n", ll_bytes);
     w->k_proj_b = (half*)ptr;
     ptr += ll * sizeof(half);
     cudaMemcpy(&ll, ptr, sizeof(unsigned long long), cudaMemcpyDeviceToHost);
     ptr += sizeof(unsigned long long);
+    cudaMemcpy(&ll_bytes, ptr, sizeof(unsigned long long), cudaMemcpyDeviceToHost);
+    ptr += sizeof(unsigned long long);
+    // printf("++++++++++++--------%llu\n", ll);
+    // printf("++++++++++++--------%llu\n", ll_bytes);
     w->v_proj_w = (half*)ptr;
     ptr += ll * sizeof(half);
     cudaMemcpy(&ll, ptr, sizeof(unsigned long long), cudaMemcpyDeviceToHost);
     ptr += sizeof(unsigned long long);
+    cudaMemcpy(&ll_bytes, ptr, sizeof(unsigned long long), cudaMemcpyDeviceToHost);
+    ptr += sizeof(unsigned long long);
+    // printf("++++++++++++--------%llu\n", ll);
+    // printf("++++++++++++--------%llu\n", ll_bytes);
     w->v_proj_b = (half*)ptr;
     ptr += ll * sizeof(half);
     cudaMemcpy(&ll, ptr, sizeof(unsigned long long), cudaMemcpyDeviceToHost);
     ptr += sizeof(unsigned long long);
+    cudaMemcpy(&ll_bytes, ptr, sizeof(unsigned long long), cudaMemcpyDeviceToHost);
+    ptr += sizeof(unsigned long long);
+    // printf("++++++++++++--------%llu\n", ll);
+    // printf("++++++++++++--------%llu\n", ll_bytes);
     w->o_proj = (half*)ptr;
     ptr += ll * sizeof(half);
     cudaMemcpy(&ll, ptr, sizeof(unsigned long long), cudaMemcpyDeviceToHost);
     ptr += sizeof(unsigned long long);
+    cudaMemcpy(&ll_bytes, ptr, sizeof(unsigned long long), cudaMemcpyDeviceToHost);
+    ptr += sizeof(unsigned long long);
+    // printf("++++++++++++--------%llu\n", ll);
+    // printf("++++++++++++--------%llu\n", ll_bytes);
     w->gate_proj = (half*)ptr;
     ptr += ll * sizeof(half);
     cudaMemcpy(&ll, ptr, sizeof(unsigned long long), cudaMemcpyDeviceToHost);
     ptr += sizeof(unsigned long long);
+    cudaMemcpy(&ll_bytes, ptr, sizeof(unsigned long long), cudaMemcpyDeviceToHost);
+    ptr += sizeof(unsigned long long);
+    // printf("++++++++++++--------%llu\n", ll);
+    // printf("++++++++++++--------%llu\n", ll_bytes);
     w->up_proj = (half*)ptr;
     ptr += ll * sizeof(half);
     cudaMemcpy(&ll, ptr, sizeof(unsigned long long), cudaMemcpyDeviceToHost);
     ptr += sizeof(unsigned long long);
+    cudaMemcpy(&ll_bytes, ptr, sizeof(unsigned long long), cudaMemcpyDeviceToHost);
+    ptr += sizeof(unsigned long long);
+    // printf("++++++++++++--------%llu\n", ll);
+    // printf("++++++++++++--------%llu\n", ll_bytes);
     w->down_proj = (half*)ptr;
     ptr += ll * sizeof(half);
     cudaMemcpy(&ll, ptr, sizeof(unsigned long long), cudaMemcpyDeviceToHost);
     ptr += sizeof(unsigned long long);
+    cudaMemcpy(&ll_bytes, ptr, sizeof(unsigned long long), cudaMemcpyDeviceToHost);
+    ptr += sizeof(unsigned long long);
+    // printf("++++++++++++--------%llu\n", ll);
+    // printf("++++++++++++--------%llu\n", ll_bytes);
     w->input_layernorm = (half*)ptr;
     ptr += ll * sizeof(half);
     cudaMemcpy(&ll, ptr, sizeof(unsigned long long), cudaMemcpyDeviceToHost);
     ptr += sizeof(unsigned long long);
+    cudaMemcpy(&ll_bytes, ptr, sizeof(unsigned long long), cudaMemcpyDeviceToHost);
+    ptr += sizeof(unsigned long long);
+    // printf("++++++++++++--------%llu\n", ll);
+    // printf("++++++++++++--------%llu\n", ll_bytes);
     w->post_attention_layernorm = (half*)ptr;
     ptr += ll * sizeof(half);
     cudaMemcpy(&ll, ptr, sizeof(unsigned long long), cudaMemcpyDeviceToHost);
     ptr += sizeof(unsigned long long);
+    cudaMemcpy(&ll_bytes, ptr, sizeof(unsigned long long), cudaMemcpyDeviceToHost);
+    ptr += sizeof(unsigned long long);
+    // printf("++++++++++++--------%llu\n", ll);
+    // printf("++++++++++++--------%llu\n", ll_bytes);
     w->norm = (half*)ptr;
     ptr += ll * sizeof(half);
     cudaMemcpy(&ll, ptr, sizeof(unsigned long long), cudaMemcpyDeviceToHost);
-    // printf("++++++++++++--------%llu\n", ll);
     ptr += sizeof(unsigned long long);
+    cudaMemcpy(&ll_bytes, ptr, sizeof(unsigned long long), cudaMemcpyDeviceToHost);
+    ptr += sizeof(unsigned long long);
+    // printf("++++++++++++--------%llu\n", ll);
+    // printf("++++++++++++--------%llu\n", ll_bytes);
     w->lm_head = (half*)ptr;
 }
 
@@ -223,7 +282,7 @@ void qwen2_build_from_checkpoint(Qwen2 *model, const char* checkpoint_path) {
     if (model_file == NULL) {
         printf("Error opening model file %s\n", checkpoint_path);
     }
-
+    char model_alignment[MODEL_LIANMENT];
     size_t file_size = 0;
     fseek(model_file, 0, SEEK_END);
     file_size = ftell(model_file);
@@ -261,7 +320,12 @@ void qwen2_build_from_checkpoint(Qwen2 *model, const char* checkpoint_path) {
     printf("config sliding_window is: %d\n", model->config.sliding_window);
     printf("config vocab_size is: %d\n", model->config.vocab_size);
 
-    size_t model_size = file_size - sizeof(model->config) - sizeof(int);
+    size_t head_bytes = sizeof(model->config) + sizeof(int);
+    if (head_bytes % MODEL_LIANMENT != 0) {
+        head_bytes += MODEL_LIANMENT - head_bytes % MODEL_LIANMENT;
+        rcount = fread(model_alignment, sizeof(char), MODEL_LIANMENT - head_bytes % MODEL_LIANMENT, model_file);
+    }
+    size_t model_size = file_size - head_bytes;
     printf("model_size: %ld bytes, via %f KB, via %f MB, via %f GB\n", 
             model_size, (float)model_size / 1024, (float)model_size / 1024 / 1024, (float)model_size / 1024 / 1024 / 1024);
 
@@ -339,6 +403,7 @@ void qwen2_build_from_checkpoint(Qwen2 *model, const char* checkpoint_path) {
     
     // free(host_memory);
 }
+
 
 typedef struct {
 

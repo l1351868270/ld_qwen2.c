@@ -38,8 +38,7 @@ if __name__ == '__main__':
 
     model_file = "qwen1.5-14B.bin"
     if model_type == "Qwen/Qwen1.5-0.5B-Chat":
-        # model_file = os.path.join(qwen2_path, "qwen1.5-0.5B.bin")
-        model_file = os.path.join(qwen2_path, "qwen1.5-0.5B_v1.bin")
+        model_file = os.path.join(qwen2_path, "qwen1.5-0.5B.bin")
     if model_type == "Qwen/Qwen1.5-1.8B-Chat":
         model_file = os.path.join(qwen2_path, "qwen1.5-1.8B.bin")
     if model_type == "Qwen/Qwen1.5-4B-Chat":
