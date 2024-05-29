@@ -619,6 +619,7 @@ if __name__ == "__main__":
     python export.py --filepath="qwen1.5-1.8B.bin" --dtype="fp16" --model_type=Qwen/Qwen1.5-1.8B-Chat
     python export.py --filepath="qwen1.5-4B.bin" --dtype="fp16" --model_type=Qwen/Qwen1.5-4B-Chat
     python export.py --filepath="qwen1.5-14B.bin" --dtype="fp16" --model_type=Qwen/Qwen1.5-14B-Chat
+    python export.py --filepath="qwen1.5-14B.bin" --dtype="fp16_v1" --model_type=Qwen/Qwen1.5-14B-Chat
     python export.py --filepath="qwen1.5-32B.bin" --dtype="fp16" --model_type=Qwen/Qwen1.5-32B-Chat
     '''
     parser = argparse.ArgumentParser()

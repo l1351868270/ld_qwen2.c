@@ -15,7 +15,9 @@ def load_csv_and_stat(path):
         "internal::gemvx::kernel",
         'simple_gemm_tt',
         "gemm",
-        "gemv_fp16",
+        # "gemv_fp16_v0",
+        "gemv_fp16_v1",
+        "gemv_fp16_v2",
     ])
     for line in lines:
         if line.startswith('=='):

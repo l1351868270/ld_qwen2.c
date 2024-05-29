@@ -47,6 +47,10 @@ if __name__ == '__main__':
         model_file = os.path.join(qwen2_path, "qwen1.5-14B.bin")
     device = "cpu"
     tokenizer = AutoTokenizer.from_pretrained(model_type)
+    stop_token_ids = [tokenizer.eos_token_id]
+
+    print(stop_token_ids)
+    # print(tokenizer.eos_token)
 
     prompt = args.prompt
     messages = [
@@ -67,9 +71,13 @@ if __name__ == '__main__':
     seq_len = len(tokenized_prompt)
     batch = 1
     max_seq_len = 256
+    # max_seq_len = 1
     pos = 0
     init(batch, max_seq_len, model_file)
-
+    print("="*50)
+    print("user:")
+    print(prompt)
+    print("assistant:")
     output = []
     begin = time.time()
     while (pos < max_seq_len):
@@ -78,16 +86,26 @@ if __name__ == '__main__':
         else:
             tokenized_prompt_c = next
         next = qwen2_forward(tokenized_prompt_c, batch, 1, pos)
-        print(f"pos:{pos} {tokenized_prompt_c}")
+        if (next[0] in stop_token_ids) and pos >= seq_len:
+            break
+
+        next_text = tokenizer.decode(
+                next,
+                skip_special_tokens=True,
+                spaces_between_special_tokens=False,
+        )
+        if (pos >= seq_len - 1):
+            print(f"{next_text}", end="", flush=True)
         output.append(tokenized_prompt_c[0])
         pos += 1
     end = time.time()
-    
+    print("")
     output.append(next[0])
     output_text = tokenizer.decode(
         output,
         skip_special_tokens=True
     )
-
-    print(output_text)
-    print(f"total time is:{end - begin:.2f}s, tokens:{max_seq_len}, achieved {max_seq_len / (end - begin):.2f} tokens/s")
+    print("="*50)
+    # print(output_text)
+    print(f"total time is:{end - begin:.2f}s, tokens:{pos}, achieved {pos / (end - begin):.2f} tokens/s")
+    print("="*50)

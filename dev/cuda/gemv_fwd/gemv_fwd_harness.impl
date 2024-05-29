@@ -1,11 +1,12 @@
 
-
+#pragma once
 
 #include <iostream>
 #include <string>
 #include <stdlib.h>
 #include <float.h>
 
+namespace gemv{
 #define CudaCheckError()    __cudaCheckError( __FILE__, __LINE__ )
 inline void __cudaCheckError( const char *file, const int line ) {
     cudaError err = cudaGetLastError();
@@ -54,11 +55,11 @@ bool check_value(float abs_tol, float rel_tol, float *h_d_c, float *h_c, int m, 
     }
     return true;
 }
-
+} // namespace gemv
 int main(int argc, char **argv) {
     constexpr size_t m = 1;
-    constexpr size_t n = 5120;
-    constexpr size_t k = 5120;
+    constexpr size_t n = 1024;
+    constexpr size_t k = 2186;
     constexpr size_t lda = (k + 16 - 1) / 16;
     constexpr size_t ldb = (n + 16 - 1) / 16;
     constexpr size_t ldc = (n + 16 - 1) / 16;
@@ -88,7 +89,7 @@ int main(int argc, char **argv) {
         h_b[i] = (half)(rand() % 10);
     }
 
-    cpu_gemm(h_a, h_b, h_c, m, n, k);
+    gemv::cpu_gemm(h_a, h_b, h_c, m, n, k);
     // for (int i = 0; i < 16; i++) {
     //     printf("[");
     //     for (int j = 0; j < n; j++) {
@@ -103,7 +104,7 @@ int main(int argc, char **argv) {
     cudaStream_t stream;
     cudaStreamCreate(&stream);
     gemv::launch_gemm(m, n, k, &alpha, d_a, lda, d_b, ldb, &beta, d_c, ldc, stream);
-    CudaCheckError();
+    gemv::CudaCheckError();
     cudaMemcpy(h_d_c, d_c, size_c, cudaMemcpyDeviceToHost);
     // printf("++++++++++++++++++++++++++++++++++\n");
     // for (int i = 0; i < 16; i++) {
@@ -117,7 +118,7 @@ int main(int argc, char **argv) {
     constexpr float abs_tol = 5.0e-2f;
     constexpr float rel_tol = 1.0e-2f;
 
-    if (check_value(abs_tol, rel_tol, h_d_c, h_c, m, n)) {
+    if (gemv::check_value(abs_tol, rel_tol, h_d_c, h_c, m, n)) {
         std::cout << "Test PASSED" << std::endl;
     } else {
         std::cout << "Test FAILED" << std::endl;
