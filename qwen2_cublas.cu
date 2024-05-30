@@ -198,7 +198,7 @@ void memory_map_weights(Qwen2Weights *w, Qwen2Config* p, char* ptr) {
     // printf("++++++++++++--------%llu\n", ll);
     // printf("++++++++++++--------%llu\n", ll_bytes);
     w->k_proj_w = (half*)ptr;
-    ptr += ll * sizeof(half);
+    ptr += ll_bytes;
     cudaMemcpy(&ll, ptr, sizeof(unsigned long long), cudaMemcpyDeviceToHost);
     ptr += sizeof(unsigned long long);
     cudaMemcpy(&ll_bytes, ptr, sizeof(unsigned long long), cudaMemcpyDeviceToHost);
@@ -206,7 +206,7 @@ void memory_map_weights(Qwen2Weights *w, Qwen2Config* p, char* ptr) {
     // printf("++++++++++++--------%llu\n", ll);
     // printf("++++++++++++--------%llu\n", ll_bytes);
     w->k_proj_b = (half*)ptr;
-    ptr += ll * sizeof(half);
+    ptr += ll_bytes;
     cudaMemcpy(&ll, ptr, sizeof(unsigned long long), cudaMemcpyDeviceToHost);
     ptr += sizeof(unsigned long long);
     cudaMemcpy(&ll_bytes, ptr, sizeof(unsigned long long), cudaMemcpyDeviceToHost);
@@ -214,7 +214,7 @@ void memory_map_weights(Qwen2Weights *w, Qwen2Config* p, char* ptr) {
     // printf("++++++++++++--------%llu\n", ll);
     // printf("++++++++++++--------%llu\n", ll_bytes);
     w->v_proj_w = (half*)ptr;
-    ptr += ll * sizeof(half);
+    ptr += ll_bytes;
     cudaMemcpy(&ll, ptr, sizeof(unsigned long long), cudaMemcpyDeviceToHost);
     ptr += sizeof(unsigned long long);
     cudaMemcpy(&ll_bytes, ptr, sizeof(unsigned long long), cudaMemcpyDeviceToHost);
@@ -222,7 +222,7 @@ void memory_map_weights(Qwen2Weights *w, Qwen2Config* p, char* ptr) {
     // printf("++++++++++++--------%llu\n", ll);
     // printf("++++++++++++--------%llu\n", ll_bytes);
     w->v_proj_b = (half*)ptr;
-    ptr += ll * sizeof(half);
+    ptr += ll_bytes;
     cudaMemcpy(&ll, ptr, sizeof(unsigned long long), cudaMemcpyDeviceToHost);
     ptr += sizeof(unsigned long long);
     cudaMemcpy(&ll_bytes, ptr, sizeof(unsigned long long), cudaMemcpyDeviceToHost);
@@ -230,7 +230,7 @@ void memory_map_weights(Qwen2Weights *w, Qwen2Config* p, char* ptr) {
     // printf("++++++++++++--------%llu\n", ll);
     // printf("++++++++++++--------%llu\n", ll_bytes);
     w->o_proj = (half*)ptr;
-    ptr += ll * sizeof(half);
+    ptr += ll_bytes;
     cudaMemcpy(&ll, ptr, sizeof(unsigned long long), cudaMemcpyDeviceToHost);
     ptr += sizeof(unsigned long long);
     cudaMemcpy(&ll_bytes, ptr, sizeof(unsigned long long), cudaMemcpyDeviceToHost);
@@ -238,7 +238,7 @@ void memory_map_weights(Qwen2Weights *w, Qwen2Config* p, char* ptr) {
     // printf("++++++++++++--------%llu\n", ll);
     // printf("++++++++++++--------%llu\n", ll_bytes);
     w->gate_proj = (half*)ptr;
-    ptr += ll * sizeof(half);
+    ptr += ll_bytes;
     cudaMemcpy(&ll, ptr, sizeof(unsigned long long), cudaMemcpyDeviceToHost);
     ptr += sizeof(unsigned long long);
     cudaMemcpy(&ll_bytes, ptr, sizeof(unsigned long long), cudaMemcpyDeviceToHost);
@@ -246,7 +246,7 @@ void memory_map_weights(Qwen2Weights *w, Qwen2Config* p, char* ptr) {
     // printf("++++++++++++--------%llu\n", ll);
     // printf("++++++++++++--------%llu\n", ll_bytes);
     w->up_proj = (half*)ptr;
-    ptr += ll * sizeof(half);
+    ptr += ll_bytes;
     cudaMemcpy(&ll, ptr, sizeof(unsigned long long), cudaMemcpyDeviceToHost);
     ptr += sizeof(unsigned long long);
     cudaMemcpy(&ll_bytes, ptr, sizeof(unsigned long long), cudaMemcpyDeviceToHost);
@@ -254,7 +254,7 @@ void memory_map_weights(Qwen2Weights *w, Qwen2Config* p, char* ptr) {
     // printf("++++++++++++--------%llu\n", ll);
     // printf("++++++++++++--------%llu\n", ll_bytes);
     w->down_proj = (half*)ptr;
-    ptr += ll * sizeof(half);
+    ptr += ll_bytes;
     cudaMemcpy(&ll, ptr, sizeof(unsigned long long), cudaMemcpyDeviceToHost);
     ptr += sizeof(unsigned long long);
     cudaMemcpy(&ll_bytes, ptr, sizeof(unsigned long long), cudaMemcpyDeviceToHost);
@@ -262,7 +262,7 @@ void memory_map_weights(Qwen2Weights *w, Qwen2Config* p, char* ptr) {
     // printf("++++++++++++--------%llu\n", ll);
     // printf("++++++++++++--------%llu\n", ll_bytes);
     w->input_layernorm = (half*)ptr;
-    ptr += ll * sizeof(half);
+    ptr += ll_bytes;
     cudaMemcpy(&ll, ptr, sizeof(unsigned long long), cudaMemcpyDeviceToHost);
     ptr += sizeof(unsigned long long);
     cudaMemcpy(&ll_bytes, ptr, sizeof(unsigned long long), cudaMemcpyDeviceToHost);
@@ -270,7 +270,7 @@ void memory_map_weights(Qwen2Weights *w, Qwen2Config* p, char* ptr) {
     // printf("++++++++++++--------%llu\n", ll);
     // printf("++++++++++++--------%llu\n", ll_bytes);
     w->post_attention_layernorm = (half*)ptr;
-    ptr += ll * sizeof(half);
+    ptr += ll_bytes;
     cudaMemcpy(&ll, ptr, sizeof(unsigned long long), cudaMemcpyDeviceToHost);
     ptr += sizeof(unsigned long long);
     cudaMemcpy(&ll_bytes, ptr, sizeof(unsigned long long), cudaMemcpyDeviceToHost);
@@ -278,7 +278,7 @@ void memory_map_weights(Qwen2Weights *w, Qwen2Config* p, char* ptr) {
     // printf("++++++++++++--------%llu\n", ll);
     // printf("++++++++++++--------%llu\n", ll_bytes);
     w->norm = (half*)ptr;
-    ptr += ll * sizeof(half);
+    ptr += ll_bytes;
     cudaMemcpy(&ll, ptr, sizeof(unsigned long long), cudaMemcpyDeviceToHost);
     ptr += sizeof(unsigned long long);
     cudaMemcpy(&ll_bytes, ptr, sizeof(unsigned long long), cudaMemcpyDeviceToHost);
