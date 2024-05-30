@@ -31,8 +31,8 @@ if __name__ == '__main__':
     # python run.py --model_type=Qwen/Qwen1.5-4B-Chat --prompt="Give me a short introduction to large language model."
     # python run.py --model_type=Qwen/Qwen1.5-14B-Chat --prompt="Give me a short introduction to large language model."
     parser = argparse.ArgumentParser()
-    parser.add_argument("--model_type", type=str, default="Qwen/Qwen1.5-0.5B-Chat")
-    parser.add_argument("-q", "--quantization_type", type=str, default="fp16")
+    parser.add_argument("-m", "--model_type", type=str, default="Qwen/Qwen1.5-0.5B-Chat")
+    parser.add_argument("-q", "--quantization_type", choices=("fp16", "q80", "q40"), type=str, default="fp16")
     parser.add_argument("-p", "--prompt", type=str, default="Give me a short introduction to large language model.")
     parser.add_argument("--max_seq_len", type=int, default=256)
     args = parser.parse_args()
@@ -51,6 +51,15 @@ if __name__ == '__main__':
             model_file = os.path.join(qwen2_path, "qwen1.5-4B.bin")
         if model_type == "Qwen/Qwen1.5-14B-Chat":
             model_file = os.path.join(qwen2_path, "qwen1.5-14B.bin")
+    if quantization_type == "q40":
+        if model_type == "Qwen/Qwen1.5-0.5B-Chat":
+            model_file = os.path.join(qwen2_path, "qwen1.5-0.5B-q40.bin")
+        if model_type == "Qwen/Qwen1.5-1.8B-Chat":
+            model_file = os.path.join(qwen2_path, "qwen1.5-1.8B-q40.bin")
+        if model_type == "Qwen/Qwen1.5-4B-Chat":
+            model_file = os.path.join(qwen2_path, "qwen1.5-4B-q40.bin")
+        if model_type == "Qwen/Qwen1.5-14B-Chat":
+            model_file = os.path.join(qwen2_path, "qwen1.5-14B-q40.bin")
     if quantization_type == "q80":
         if model_type == "Qwen/Qwen1.5-0.5B-Chat":
             model_file = os.path.join(qwen2_path, "qwen1.5-0.5B-q80.bin")
@@ -60,6 +69,7 @@ if __name__ == '__main__':
             model_file = os.path.join(qwen2_path, "qwen1.5-4B-q80.bin")
         if model_type == "Qwen/Qwen1.5-14B-Chat":
             model_file = os.path.join(qwen2_path, "qwen1.5-14B-q80.bin")
+
     device = "cpu"
     tokenizer = AutoTokenizer.from_pretrained(model_type)
     stop_token_ids = [tokenizer.eos_token_id]
@@ -99,9 +109,9 @@ if __name__ == '__main__':
         else:
             tokenized_prompt_c = next
         next = qwen2_forward(tokenized_prompt_c, batch, 1, pos)
+        # break
         if (next[0] in stop_token_ids) and pos >= seq_len:
             break
-
         next_text = tokenizer.decode(
                 next,
                 skip_special_tokens=True,

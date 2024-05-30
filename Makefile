@@ -19,8 +19,10 @@ v1: qwen2_v1.cu
 q80: qwen2_q80.cu
 	$(CC) --shared -Xcompiler -fPIC -std=c++17 -o qwen2.so -O3 qwen2_q80.cu -lm -gencode arch=compute_80,code=sm_80
 
+q40: qwen2_q40.cu
+	$(CC) --shared -Xcompiler -fPIC -std=c++17 -o qwen2.so -O3 qwen2_q40.cu -lm -gencode arch=compute_80,code=sm_80
 
-all: v0 v1 v2 v3 q80 cublas
+all: v0 v1 v2 v3 q80 q40 cublas
 
 run:
 	ncu --help

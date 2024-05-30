@@ -69,6 +69,9 @@ def generate(model, tokenizer, tokenized_prompt, steps):
             query_states = decoder_layer.self_attn.q_proj(hidden_states)
             print(query_states.shape)
             print(query_states)
+
+            print(decoder_layer.self_attn.q_proj.weight)
+
             key_states = decoder_layer.self_attn.k_proj(hidden_states)
             # print(key_states.shape)
             # print(key_states)
