@@ -19,8 +19,10 @@ GHA
 MHA
 
 ## 量化
-
+### Vector-wise Quantization
 weight int8
+
+weight int4
 
 # TODO
 ## kv cache
