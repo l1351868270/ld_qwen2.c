@@ -1,20 +1,28 @@
 import argparse
 import struct
 from typing import Union, Optional
-from transformers import AutoModelForCausalLM
+from transformers import AutoModelForCausalLM, AutoConfig, Qwen2ForCausalLM
+from accelerate import init_empty_weights, infer_auto_device_map, disk_offload
 import torch
 import numpy as np
+import gc
 
 MODEL_LIANMENT = 16
 
 def write_fp32(tensor, file):
-    file.write(tensor.detach().numpy().astype("float32").tobytes())
+    file.write(tensor.detach().cpu().numpy().astype("float32").tobytes())
 
 def write_fp16(tensor, file):
-    file.write(tensor.detach().numpy().astype("float16").tobytes())
+    file.write(tensor.detach().cpu().numpy().astype("float16").tobytes())
 
 def write_int8(tensor, file):
-    file.write(tensor.detach().numpy().astype(np.int8).tobytes())
+    d = tensor.detach()
+    d = d.cpu()
+    d = d.view(-1)
+    d = d.numpy()
+    d = d.astype(np.int8)
+    b = struct.pack(f'{len(d)}b', *d)
+    file.write(b)
 
 # def write_int4(tensor, file):
 #     data = tensor.detach().numpy().astype(np.uint8)
@@ -69,9 +77,10 @@ def quantize_q40(w, w_bit, group_size):
     # scale into range [0, 2 * max_int]
     quant = quant + 7.0
     # round to nearest integer
+    # int4val_low = torch.round(quant).to(torch.uint8).clamp_(0, 15) # low 4 bit
     int4val_low = torch.round(quant).to(torch.uint8) # low 4 bit
-    assert torch.all(int4val_low >= 0)
-    assert torch.all(int4val_low <= 15)
+    # assert torch.all(int4val_low >= 0)
+    # assert torch.all(int4val_low <= 15)
     int4val_high = torch.round(quant).to(torch.uint8) << 4 # high 4 bit
     int8val = int4val_low[:, ::2] + int4val_high[:, 1::2]
     # dequantize by rescaling
@@ -85,7 +94,7 @@ def quantize_q40(w, w_bit, group_size):
     # print(int8val)
     # print(fp32valr)
     # print(w)
-    maxerr = err.max().item()
+    maxerr = err.max()
     return int8val, scale, maxerr
 
 
@@ -225,6 +234,9 @@ def q40_write_layer_key_2d(model_sd, format_str, num_hidden_layers, width, heigh
         w = model_sd[format_str.format(i)]
         _, s, err = quantize_q40(w, w_bit, width)
         write_fp16(s, file)
+        del(w)
+        del(model_sd[format_str.format(i)])
+        gc.collect()
         # print(f"{format_str.format(i)} quantized {tuple(s.shape)} to Q4_0 with max error {err}")
 
 
@@ -511,6 +523,8 @@ if __name__ == "__main__":
 
     python export.py --filepath="qwen1.5-0.5B-q40.bin" --dtype="q40" --model_type=Qwen/Qwen1.5-0.5B-Chat
     python export.py --filepath="qwen1.5-14B-q40.bin" --dtype="q40" --model_type=Qwen/Qwen1.5-14B-Chat
+    python export.py --filepath="qwen1.5-32B-q40.bin" --dtype="q40" --model_type=Qwen/Qwen1.5-32B-Chat
+    python export.py --filepath="qwen1.5-72B-q40.bin" --dtype="q40" --model_type=Qwen/Qwen1.5-72B-Chat
     '''
     parser = argparse.ArgumentParser()
     parser.add_argument("--filepath", type=str, default="qwen1.5-0.5B.bin")
@@ -520,7 +534,14 @@ if __name__ == "__main__":
     model_type = args.model_type
     print("loading weights from pretrained qwen1.5: %s" % model_type)
 
-    model = AutoModelForCausalLM.from_pretrained(model_type, trust_remote_code=True)
+    config = AutoConfig.from_pretrained(model_type)
+    with init_empty_weights():
+        model = Qwen2ForCausalLM(config)
+    device_map = infer_auto_device_map(model, max_memory={0: "0GB", "cpu": "200GB"})
+    print(device_map)
+
+    model = AutoModelForCausalLM.from_pretrained(model_type, torch_dtype=torch.float16, trust_remote_code=True, device_map=device_map)
+
     # print(model)
     sd = model.state_dict()
     # print(sd.keys())

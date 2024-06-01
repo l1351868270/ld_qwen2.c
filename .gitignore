@@ -12,3 +12,9 @@
 *.sqlite
 test*
 benchmark/
+
+__pycache__
+*.pyc
+data
+flagged
+openai_api.py
