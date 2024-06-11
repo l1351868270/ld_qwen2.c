@@ -26,6 +26,8 @@ class CLDQwen2:
                 self.checkpoint_path = os.path.join(self.qwen2_path, "qwen1.5-1.8B.bin")
             if model_type == "Qwen/Qwen1.5-4B-Chat":
                 self.checkpoint_path = os.path.join(self.qwen2_path, "qwen1.5-4B.bin")
+            if model_type == "Qwen/Qwen1.5-7B-Chat":
+                self.checkpoint_path = os.path.join(self.qwen2_path, "qwen1.5-7B.bin")
             if model_type == "Qwen/Qwen1.5-14B-Chat":
                 self.checkpoint_path = os.path.join(self.qwen2_path, "qwen1.5-14B.bin")
         if quantization_type == "q40":
@@ -35,6 +37,8 @@ class CLDQwen2:
                 self.checkpoint_path = os.path.join(self.qwen2_path, "qwen1.5-1.8B-q40.bin")
             if model_type == "Qwen/Qwen1.5-4B-Chat":
                 self.checkpoint_path = os.path.join(self.qwen2_path, "qwen1.5-4B-q40.bin")
+            if model_type == "Qwen/Qwen1.5-7B-Chat":
+                self.checkpoint_path = os.path.join(self.qwen2_path, "qwen1.5-7B-q40.bin")
             if model_type == "Qwen/Qwen1.5-14B-Chat":
                 self.checkpoint_path = os.path.join(self.qwen2_path, "qwen1.5-14B-q40.bin")
             if model_type == "Qwen/Qwen1.5-32B-Chat":
@@ -46,6 +50,8 @@ class CLDQwen2:
                 self.checkpoint_path = os.path.join(self.qwen2_path, "qwen1.5-1.8B-q80.bin")
             if model_type == "Qwen/Qwen1.5-4B-Chat":
                 self.checkpoint_path = os.path.join(self.qwen2_path, "qwen1.5-4B-q80.bin")
+            if model_type == "Qwen/Qwen1.5-7B-Chat":
+                self.checkpoint_path = os.path.join(self.qwen2_path, "qwen1.5-7B-q80.bin")
             if model_type == "Qwen/Qwen1.5-14B-Chat":
                 self.checkpoint_path = os.path.join(self.qwen2_path, "qwen1.5-14B-q80.bin")
             if model_type == "Qwen/Qwen1.5-32B-Chat":
@@ -87,6 +93,34 @@ class CLDQwen2:
         seq_len = len(tokenized_prompt)
         return tokenized_prompt, seq_len
     
+    def tokenized_prompt_v1(self, prompt):
+        model_inputs = self.tokenizer.encode(prompt, return_tensors="pt").to(self.device)
+        tokenized_prompt = model_inputs.flatten().tolist()
+        seq_len = len(tokenized_prompt)
+        return tokenized_prompt, seq_len
+    
+    def tokenized_prompts(self, prompts):
+        texts = []
+        for prompt in prompts:
+            messages = [
+                {"role": "system", "content": "You are a helpful assistant."},
+                {"role": "user", "content": prompt}
+            ]
+            text = self.tokenizer.apply_chat_template(
+                messages,
+                tokenize=False,
+                add_generation_prompt=True
+            )
+            texts.append(text)
+        model_inputs = self.tokenizer(texts, padding=True, return_tensors="pt")
+        model_inputs = model_inputs["input_ids"].tolist()
+        return model_inputs, len(model_inputs[0])
+
+    def tokenized_prompts_v1(self, prompts):
+        model_inputs = self.tokenizer(prompts, padding=True, return_tensors="pt")
+        model_inputs = model_inputs["input_ids"].tolist()
+        return model_inputs, len(model_inputs[0])
+    
     def chat(self, tokenized_prompt, seq_len):
         output_text = ""
         pos = 0
@@ -110,6 +144,29 @@ class CLDQwen2:
             pos += 1
         return output_text, pos
 
+    def batch_chat(self, tokenized_prompt, batch, seq_len):
+        output_text = ""
+        pos = 0
+        while (pos < self.max_seq_len):
+            if pos < seq_len:
+                tokenized_prompt_c = [tokenized_prompt[pos]]
+            else:
+                tokenized_prompt_c = next
+            next = self.qwen2_forward(tokenized_prompt_c, 1, pos)
+
+            if (next[0] in self.stop_token_ids) and pos >= seq_len:
+                break
+            next_text = self.tokenizer.decode(
+                    next,
+                    skip_special_tokens=True,
+                    # spaces_between_special_tokens=False,
+            )
+            if (pos >= seq_len - 1):
+                # yield next_text
+                output_text += next_text
+            pos += 1
+        return output_text, pos
+    
     def stream_chat(self, tokenized_prompt, seq_len):
         pos = 0
         while (pos < self.max_seq_len):
@@ -130,74 +187,46 @@ class CLDQwen2:
                 yield next_text
             pos += 1
 
+    def batch_stream_chat(self, tokenized_prompt, seq_len):
+        pos = 0
+        stop = [False for i in range(self.batch)]
+        while (pos < self.max_seq_len):
+            if pos < seq_len:
+                tokenized_prompt_c = []
+                for i in range(self.batch):
+                    tokenized_prompt_c.append(tokenized_prompt[i][pos])
+            else:
+                tokenized_prompt_c = next
 
-# qwen2lib = CDLL(os.path.join(qwen2_path, "./qwen2.so"))
+            # print(f"tokenized_prompt_c: {tokenized_prompt_c}")
+            next = self.qwen2_forward(tokenized_prompt_c, self.batch, pos)
+            
 
-# def init(batch: int, max_seq_len: int, checkpoint_path: str):
-#     qwen2lib.c_init.argtypes = [c_int, c_int, c_char_p]
-#     checkpoint_path_buffer = create_string_buffer(checkpoint_path.encode("utf-8"))
-#     qwen2lib.c_init(c_int(batch), c_int(max_seq_len), checkpoint_path_buffer)
+            if pos >= seq_len:
+                for i in range(self.batch):
+                    if next[i] in self.stop_token_ids:
+                        stop[i] = True
+            if all(stop) and pos >= seq_len:
+                break
 
-# def qwen2_forward(token, batch, seq_len, pos)->list:
-#     qwen2lib.c_qwen2_forward.restype = POINTER(c_int * batch)
-#     sample = qwen2lib.c_qwen2_forward(c_int(batch), c_int(seq_len), (c_int * len(token))(*token), c_int(pos)) 
-#     res = []
-#     for i in sample.contents:
-#         res.append(int(i))
-#     return res
+            next_text = []
 
-# def chat(max_seq_len, tokenized_prompt, seq_len, batch, stop_token_ids, tokenizer):
-#     global pos
-#     global output
-#     global output_text
-    
-#     while (pos < max_seq_len):
-#         if pos < seq_len:
-#             tokenized_prompt_c = [tokenized_prompt[pos]]
-#         else:
-#             tokenized_prompt_c = next
-#         next = qwen2_forward(tokenized_prompt_c, batch, 1, pos)
-
-#         if (next[0] in stop_token_ids) and pos >= seq_len:
-#             break
-#         next_text = tokenizer.decode(
-#                 next,
-#                 skip_special_tokens=True,
-#                 # spaces_between_special_tokens=False,
-#         )
-#         if (pos >= seq_len - 1):
-#             print(f"{next_text}", end="", flush=True)
-#             output.append(next[0])
-#             output_text.append(next)
-#         pos += 1
-    
-#     print("")
-
-# def stream_chat(max_seq_len, tokenized_prompt, seq_len, batch, stop_token_ids, tokenizer):
-#     pos = 0
-#     while (pos < max_seq_len):
-#         if pos < seq_len:
-#             tokenized_prompt_c = [tokenized_prompt[pos]]
-#         else:
-#             tokenized_prompt_c = next
-#         next = qwen2_forward(tokenized_prompt_c, batch, 1, pos)
-
-#         if (next[0] in stop_token_ids) and pos >= seq_len:
-#             break
-#         next_text = tokenizer.decode(
-#                 next,
-#                 skip_special_tokens=True,
-#                 # spaces_between_special_tokens=False,
-#         )
-#         if (pos >= seq_len - 1):
-#             yield next_text
-#         pos += 1
+            for i in range(self.batch):
+                t = self.tokenizer.decode(
+                    [next[i]],
+                    skip_special_tokens=True,
+                    # spaces_between_special_tokens=False,
+                )
+                next_text.append(t)
+            if (pos >= seq_len - 1):
+                yield next_text, next
+            pos += 1
 
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("-m", "--model_type", type=str, default="Qwen/Qwen1.5-0.5B-Chat")
     parser.add_argument("-q", "--quantization_type", choices=("fp16", "q80", "q40"), type=str, default="fp16")
-    parser.add_argument("-p", "--prompt", type=str, default="Give me a short introduction to large language model.")
+    parser.add_argument("-p", "--prompt", nargs='+', type=str, default="Give me a short introduction to large language model.")
     parser.add_argument("--max_seq_len", type=int, default=256)
     parser.add_argument("--batch", type=int, default=1)
     return parser.parse_args()
@@ -207,12 +236,13 @@ if __name__ == '__main__':
     # python run.py --model_type=Qwen/Qwen1.5-1.8B-Chat --prompt="Give me a short introduction to large language model."
     # python run.py --model_type=Qwen/Qwen1.5-4B-Chat --prompt="Give me a short introduction to large language model."
     # python run.py --model_type=Qwen/Qwen1.5-14B-Chat --prompt="Give me a short introduction to large language model."
-
+    # python run.py -p "天空为什么是蓝色的？"
     args = parse_args()
     model_type = args.model_type
     quantization_type = args.quantization_type
     max_seq_len = args.max_seq_len
     prompt = args.prompt
+    print(prompt)
     batch = args.batch
 
     model = CLDQwen2(model_type, quantization_type, batch, max_seq_len)
@@ -220,21 +250,50 @@ if __name__ == '__main__':
 
     print("="*50)
     print("user:")
-    print(prompt)
+    print(prompt[0])
     print("assistant:")
+    # print("tokenized_prompt:")
+    # tokenized_prompts, seq_len = model.tokenized_prompt(prompt[0])
+    # print(tokenized_prompts, seq_len)
+    # print("tokenized_prompt_v1:")
+    # tokenized_prompts, seq_len = model.tokenized_prompt_v1(prompt[0])
+    # print(tokenized_prompts, seq_len)
+    # print("tokenized_prompts:")
+    tokenized_prompts, seq_len = model.tokenized_prompts(prompt)
+    # print(tokenized_prompts, seq_len)
+    # print("tokenized_prompts_v1:")
+    # tokenized_prompts, seq_len = model.tokenized_prompts_v1(prompt)
+    # print(tokenized_prompts, seq_len)
     begin = time.time()
+    num_tokens = seq_len
 
-    # chat(max_seq_len, tokenized_prompt, seq_len, batch, stop_token_ids, tokenizer)
-    tokenized_prompt, seq_len = model.tokenized_prompt(prompt)
-    # num_tokens = seq_len
-    # for text in model.stream_chat(tokenized_prompt, seq_len):
-    #     print(f"{text}", end="", flush=True)
-    #     num_tokens += 1
-    output_text, num_tokens = model.chat(tokenized_prompt, seq_len)
-    print(f"{output_text}", end="\n", flush=True)
+    next_texts = []
+    next_ids = []
+    stop_flag = False
+    for text, id in model.batch_stream_chat(tokenized_prompts, seq_len):
+        if id[0] in model.stop_token_ids:
+            stop_flag = True
+        if stop_flag == False and id[0] not in model.stop_token_ids:
+            print(f"{text[0]}", end="", flush=True)
+        num_tokens += 1
+        next_texts.append(text)
+        next_ids.append(id)
     end = time.time()
     print("")
+    for b in range(1, batch):
+        print("="*50)
+        print("user:")
+        print(prompt[b])
+        print("assistant:")
+        stop_flag = False
+        for text, id in zip(next_texts, next_ids):
+            if id[b] in model.stop_token_ids:
+                stop_flag = True
+
+            if stop_flag == False and id[b] not in model.stop_token_ids:
+                print(f"{text[b]}", end="", flush=True)
+        print("")
     print("="*50)
     # print(output_text)
-    print(f"total time is:{end - begin:.2f}s, tokens:{num_tokens}, achieved {num_tokens / (end - begin):.2f} tokens/s")
+    print(f"total time is:{end - begin:.2f}s, batch:{batch}, tokens:{num_tokens}, achieved {num_tokens / (end - begin):.2f} tokens/s")
     print("="*50)

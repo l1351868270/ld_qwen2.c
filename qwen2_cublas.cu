@@ -493,26 +493,60 @@ void rmsnorm_forward(float* o, float* x, half *weight, float rms_norm_eps, int b
 
 __global__ 
 void half2float_forward(float* output, half* input) {
-    int bid = blockIdx.x;
+    int b = blockIdx.x;
+    int dim = WARPGROUP_THREADS * gridDim.y;
+    int bid = blockIdx.y;
     int tid = threadIdx.x;
-    int offset = bid * WARPGROUP_THREADS + tid;
+    int offset = b * dim + bid * WARPGROUP_THREADS + tid;
     output[offset] = __half2float(input[offset]);
+    // if (thread0()) {
+    //     printf("half2float_forward:\n");
+    //     int batch = gridDim.x;
+    //     for (int b = 0; b < batch; b++) {
+    //         int offset = b * dim;
+    //         printf("[");
+    //         for (int d = 0; d < dim; d++) {
+    //              printf("%f, ", output[offset + d]);
+    //         }
+    //         printf("],\n");
+    //     }
+    // }
+
 }
 
 __global__ 
 void float2half_forward(half* output, float* input) {
-    int bid = blockIdx.x;
+    int b = blockIdx.x;
+    int dim = WARPGROUP_THREADS * gridDim.y;
+    int bid = blockIdx.y;
     int tid = threadIdx.x;
-    int offset = bid * WARPGROUP_THREADS + tid;
+    int offset = b * dim + bid * WARPGROUP_THREADS + tid;
     output[offset] = __float2half(input[offset]);
+
+    // if (thread0()) {
+    //     printf("float2half_forward:\n");
+    //     int batch = gridDim.x;
+    //     for (int b = 0; b < batch; b++) {
+    //         int offset = b * dim;
+    //         printf("[");
+    //         for (int d = 0; d < dim; d++) {
+    //              printf("%f, ", __half2float(output[offset + d]));
+    //         }
+    //         printf("],\n");
+    //     }
+    // }
 }
 
 __global__ 
 void add_forward(float* output, half* input) {
-    int bid = blockIdx.x;
+    int b = blockIdx.x;
+    int dim = WARPGROUP_THREADS * gridDim.y;
+    int bid = blockIdx.y;
     int tid = threadIdx.x;
-    int offset = bid * WARPGROUP_THREADS + tid;
-    output[offset] += __half2float(input[offset]);
+    int offset_o = b * dim + bid * WARPGROUP_THREADS + tid;
+    int offset_i = bid * WARPGROUP_THREADS + tid;
+    output[offset_o] += __half2float(input[offset_i]);
+
 }
 
 // https://pytorch.org/docs/stable/generated/torch.nn.Linear.html
@@ -524,32 +558,45 @@ void linear_forward(cublasHandle_t* handle, float* output, half* input, half *we
     float alpha = 1.f;
     float beta = 0.0f;
     
-    cublasStatus_t status = cublasSgemmEx(*handle, CUBLAS_OP_T, CUBLAS_OP_N, 
-                                          M, N, K,
-                                          &alpha, 
-                                          input, CUDA_R_16F, K, 
-                                          weight, CUDA_R_16F, K, 
-                                          &beta, 
-                                          output, CUDA_R_32F, M);
-
     // cublasStatus_t status = cublasSgemmEx(*handle, CUBLAS_OP_T, CUBLAS_OP_N, 
-    //                                       N, M, K,
+    //                                       M, N, K,
     //                                       &alpha, 
-    //                                       weight, CUDA_R_16F, K, 
     //                                       input, CUDA_R_16F, K, 
+    //                                       weight, CUDA_R_16F, K, 
     //                                       &beta, 
-    //                                       output, CUDA_R_32F, N);
+    //                                       output, CUDA_R_32F, M);
+
+    cublasStatus_t status = cublasSgemmEx(*handle, CUBLAS_OP_T, CUBLAS_OP_N, 
+                                          N, M, K,
+                                          &alpha, 
+                                          weight, CUDA_R_16F, K, 
+                                          input, CUDA_R_16F, K, 
+                                          &beta, 
+                                          output, CUDA_R_32F, N);
 
     if (bias != NULL) {
-        add_forward<<<out_features / WARPGROUP_THREADS, WARPGROUP_THREADS>>>(output, bias);
+        add_forward<<<dim3(batch, out_features / WARPGROUP_THREADS), WARPGROUP_THREADS>>>(output, bias);
     }
 
-    // float *H_C = (float*)malloc(batch * out_features * sizeof(float));
-    // cudaMemcpy(H_C, output, batch * out_features * sizeof(float), cudaMemcpyDeviceToHost);
-    // for (int b = 0; b < batch; b++) {
+    half *H_input = (half*)malloc(M * K * sizeof(half));
+    cudaMemcpy(H_input, input, M * K * sizeof(half), cudaMemcpyDeviceToHost);
+
+    // printf("linear_forward input:\n");
+    // for (int b = 0; b < M; b++) {
     //     printf("[");
-    //     for (int i = 0; i < out_features; i++) {
-    //         printf("%f, ", H_C[b * out_features + i]);
+    //     for (int i = 0; i < K; i++) {
+    //         printf("%f, ", __half2float(H_input[b * K + i]));
+    //     }
+    //     printf("]\n");
+    // }
+
+    // float *H_C = (float*)malloc(M * N * sizeof(float));
+    // cudaMemcpy(H_C, output, M * N * sizeof(float), cudaMemcpyDeviceToHost);
+    // printf("linear_forward H_C:\n");
+    // for (int b = 0; b < M; b++) {
+    //     printf("[");
+    //     for (int i = 0; i < N; i++) {
+    //         printf("%f, ", H_C[b * N + i]);
     //     }
     //     printf("]\n");
     // }
@@ -616,11 +663,11 @@ void group_flash_attention_forward(float* output, float *q, float *key_cache, fl
     *d = 1.0f;
 
     int offset_q = b * q_heads * head_dim + h * head_dim;
-    int offset_k = b * num_transformer_layers * max_seq_len * max_kv_heads * head_dim 
-                 + layer_idx * max_seq_len * max_kv_heads * head_dim 
-                 + 0 * max_kv_heads * head_dim
+    int offset_k = layer_idx * max_seq_len * batch * max_kv_heads * head_dim 
+                 + 0 * batch * max_kv_heads * head_dim
+                 + b * max_kv_heads * head_dim
                  + (h / num_groups)  * head_dim;
-        
+
     float score = 0.0f;
     for (int i = lid; i < head_dim; i += WARP_THREADS){
         score += q[offset_q + i] * key_cache[offset_k + i];
@@ -642,16 +689,14 @@ void group_flash_attention_forward(float* output, float *q, float *key_cache, fl
 
     int offset_o = b * q_heads * head_dim + h * head_dim;
     for (int lv = tid; lv < head_dim; lv += WARPGROUP_THREADS){
-        int offset_v = b * num_transformer_layers * max_seq_len * max_kv_heads * head_dim 
-                     + layer_idx * max_seq_len * max_kv_heads * head_dim 
-                     + 0 * max_kv_heads * head_dim
-                     + (h / num_groups) * head_dim;
+        int offset_v = layer_idx * max_seq_len * batch * max_kv_heads * head_dim 
+                    + 0 * batch * max_kv_heads * head_dim
+                    + b * max_kv_heads * head_dim
+                    + (h / num_groups) * head_dim;
         o[lv] = value_cache[offset_v + lv];
         output[offset_o + lv] = o[lv];
     }
 
-    
-    
     // flash attention
     float m_i1 = 0.0f;
     float m_i = 0.0f;
@@ -662,11 +707,11 @@ void group_flash_attention_forward(float* output, float *q, float *key_cache, fl
 
     __syncthreads();
     for (int lk = 1; lk < pos + 1; lk++) {
-        int offset_k = b * num_transformer_layers * max_seq_len * max_kv_heads * head_dim 
-                         + layer_idx * max_seq_len * max_kv_heads * head_dim 
-                         + lk * max_kv_heads * head_dim
-                         + (h / num_groups)  * head_dim;
-        
+        int offset_k = layer_idx * max_seq_len * batch * max_kv_heads * head_dim 
+                    + lk * batch * max_kv_heads * head_dim
+                    + b * max_kv_heads * head_dim
+                    + (h / num_groups)  * head_dim;
+
         // score = 0.0f;
         // for (int i = 0; i < head_dim; i++) {
         //     score += q[offset_q + i] * key_cache[offset_k + i];
@@ -700,10 +745,11 @@ void group_flash_attention_forward(float* output, float *q, float *key_cache, fl
         __syncthreads();
         for (int lv = tid; lv < head_dim; lv += kNThreads){
             o_i1 = o[lv];
-            int offset_v = b * num_transformer_layers * max_seq_len * max_kv_heads * head_dim 
-                         + layer_idx * max_seq_len * max_kv_heads * head_dim 
-                         + lk * max_kv_heads * head_dim
+            int offset_v = layer_idx * max_seq_len * batch * max_kv_heads * head_dim 
+                         + lk * batch * max_kv_heads * head_dim
+                         + b * max_kv_heads * head_dim
                          + (h / num_groups) * head_dim;
+
             o_i = o_i1 * (d_i1 * __expf(m_i1 - m_i) / d_i) + __expf(score - m_i) / d_i * value_cache[offset_v + lv];
             o[lv] = o_i;
             output[offset_o + lv] = o_i;
@@ -891,22 +937,21 @@ void* qwen2_forward(Context *ctx, cublasHandle_t *handle, Qwen2* qwen2, int *tok
         // attn_norm
         rmsnorm_forward<<<dim3(batch, hidden_size / WARPGROUP_THREADS), WARPGROUP_THREADS>>>(s->xb, s->x, w->input_layernorm + l*hidden_size, rms_norm_eps, batch, hidden_size);
 
-        int offset_k = l * max_seq_len * num_key_value_heads * head_dim 
-                         + pos * num_key_value_heads * head_dim;
-        int offset_v = l * max_seq_len * num_key_value_heads * head_dim 
-                         + pos * num_key_value_heads * head_dim;
+        int offset_k = l * max_seq_len * batch * num_key_value_heads * head_dim 
+                         + pos * batch * num_key_value_heads * head_dim;
+        int offset_v = l * max_seq_len * batch * num_key_value_heads * head_dim 
+                         + pos * batch * num_key_value_heads * head_dim;
         s->k = s->key_cache + offset_k;
         s->v = s->value_cache + offset_v;
 
         // batch * p->num_hidden_layers * seq_len * num_heads * head_dim
 
-        float2half_forward<<<hidden_size / WARPGROUP_THREADS, WARPGROUP_THREADS>>>(s->half_xb, s->xb);
+        float2half_forward<<<dim3(batch, hidden_size / WARPGROUP_THREADS), WARPGROUP_THREADS>>>(s->half_xb, s->xb);
         linear_forward(s->handle, s->q, s->half_xb, w->q_proj_w + l * hidden_size * (num_heads * head_dim), w->q_proj_b + l * (num_heads * head_dim), batch, hidden_size, num_heads * head_dim);
         linear_forward(s->handle, s->k, s->half_xb, w->k_proj_w + l * hidden_size * (num_key_value_heads * head_dim), w->k_proj_b + l * (num_key_value_heads * head_dim), batch, hidden_size, num_key_value_heads * head_dim);
         linear_forward(s->handle, s->v, s->half_xb, w->v_proj_w + l * hidden_size * (num_key_value_heads * head_dim), w->v_proj_b + l * (num_key_value_heads * head_dim), batch, hidden_size, num_key_value_heads * head_dim);
 
         rope_forward<<<dim3(batch, num_heads), WARPGROUP_THREADS>>>(s->q, rope_theta, batch, num_heads, head_dim, pos);
-
         rope_forward<<<dim3(batch, num_key_value_heads), WARPGROUP_THREADS>>>(s->k, rope_theta, batch, num_heads, head_dim, pos);
 
         // group attention
@@ -914,7 +959,7 @@ void* qwen2_forward(Context *ctx, cublasHandle_t *handle, Qwen2* qwen2, int *tok
                              batch, num_heads, num_key_value_heads, head_dim, num_heads, num_key_value_heads, max_seq_len, 
                              num_hidden_layers, l, pos);
 
-        float2half_forward<<<num_heads * head_dim / WARPGROUP_THREADS, WARPGROUP_THREADS>>>(s->half_xb, s->xb);
+        float2half_forward<<<dim3(batch, num_heads * head_dim / WARPGROUP_THREADS), WARPGROUP_THREADS>>>(s->half_xb, s->xb);
         linear_forward(s->handle, s->xb2, s->half_xb, w->o_proj + l * (num_heads * head_dim) * hidden_size, NULL, batch, num_heads * head_dim, hidden_size);
 
         residual_forward<<<dim3(batch, hidden_size / WARPGROUP_THREADS), WARPGROUP_THREADS>>>(s->x, s->xb2, batch, hidden_size);
@@ -922,13 +967,13 @@ void* qwen2_forward(Context *ctx, cublasHandle_t *handle, Qwen2* qwen2, int *tok
         // ffn_norm
         rmsnorm_forward<<<dim3(batch, hidden_size / WARPGROUP_THREADS), WARPGROUP_THREADS>>>(s->xb, s->x, w->post_attention_layernorm + l*hidden_size, rms_norm_eps, batch, hidden_size);
 
-        float2half_forward<<<hidden_size / WARPGROUP_THREADS, WARPGROUP_THREADS>>>(s->half_xb, s->xb);
+        float2half_forward<<<dim3(batch, hidden_size / WARPGROUP_THREADS), WARPGROUP_THREADS>>>(s->half_xb, s->xb);
         linear_forward(s->handle, s->hb, s->half_xb, w->gate_proj + l*intermediate_size*hidden_size, NULL, batch, hidden_size, intermediate_size);
         linear_forward(s->handle, s->hb2, s->half_xb, w->up_proj + l*intermediate_size*hidden_size, NULL, batch, hidden_size, intermediate_size);
 
         silu_forward<<<dim3(batch, intermediate_size / WARPGROUP_THREADS), WARPGROUP_THREADS>>>(s->hb, s->hb2, batch, intermediate_size);
 
-        float2half_forward<<<intermediate_size / WARPGROUP_THREADS, WARPGROUP_THREADS>>>(s->half_hb, s->hb);
+        float2half_forward<<<dim3(batch, intermediate_size / WARPGROUP_THREADS), WARPGROUP_THREADS>>>(s->half_hb, s->hb);
         linear_forward(s->handle, s->xb, s->half_hb, w->down_proj + l* hidden_size * intermediate_size, NULL, batch, intermediate_size, hidden_size);
 
         residual_forward<<<dim3(batch, hidden_size / WARPGROUP_THREADS), WARPGROUP_THREADS>>>(s->x, s->xb, batch, hidden_size);
@@ -938,7 +983,7 @@ void* qwen2_forward(Context *ctx, cublasHandle_t *handle, Qwen2* qwen2, int *tok
 
     rmsnorm_forward<<<dim3(batch, hidden_size / WARPGROUP_THREADS), WARPGROUP_THREADS>>>(s->x, s->x, w->norm, rms_norm_eps, batch, hidden_size);
     
-    float2half_forward<<<hidden_size / WARPGROUP_THREADS, WARPGROUP_THREADS>>>(s->half_x, s->x);
+    float2half_forward<<<dim3(batch, hidden_size / WARPGROUP_THREADS), WARPGROUP_THREADS>>>(s->half_x, s->x);
     // logits_forward<<<dim3(batch, vocab_size / WARPGROUP_THREADS), WARPGROUP_THREADS>>>(s->logits, s->x, w->lm_head, NULL, batch, hidden_size, vocab_size);
     linear_forward(s->handle,s->logits, s->half_x, w->lm_head, NULL, batch, hidden_size, vocab_size);
 
