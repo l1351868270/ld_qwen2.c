@@ -232,17 +232,12 @@ def parse_args():
     return parser.parse_args()
 
 if __name__ == '__main__':
-    # python run.py --model_type=Qwen/Qwen1.5-0.5B-Chat --prompt="Give me a short introduction to large language model."
-    # python run.py --model_type=Qwen/Qwen1.5-1.8B-Chat --prompt="Give me a short introduction to large language model."
-    # python run.py --model_type=Qwen/Qwen1.5-4B-Chat --prompt="Give me a short introduction to large language model."
-    # python run.py --model_type=Qwen/Qwen1.5-14B-Chat --prompt="Give me a short introduction to large language model."
-    # python run.py -p "天空为什么是蓝色的？"
+    # python run.py -p "天空为什么是蓝色的" "天空为什么是蓝色的" "天空为什么是蓝色的" "天空为什么是蓝色的" "天空为什么是蓝色的" "天空为什么是蓝色的" "天空为什么是蓝色的" "天空为什么是蓝色的" "天空为什么是蓝色的" "天空为什么是蓝色的" "天空为什么是蓝色的" "天空为什么是蓝色的" "天空为什么是蓝色的" "天空为什么是蓝色的" "天空为什么是蓝色的" "天空为什么是蓝色的" --batch 16
     args = parse_args()
     model_type = args.model_type
     quantization_type = args.quantization_type
     max_seq_len = args.max_seq_len
     prompt = args.prompt
-    print(prompt)
     batch = args.batch
 
     model = CLDQwen2(model_type, quantization_type, batch, max_seq_len)
