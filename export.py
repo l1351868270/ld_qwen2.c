@@ -517,6 +517,7 @@ if __name__ == "__main__":
     python export.py --filepath="qwen1.5-32B.bin" --dtype="fp16" --model_type=Qwen/Qwen1.5-32B-Chat
 
     python export.py --filepath="qwen1.5-0.5B-q80.bin" --dtype="q80" --model_type=Qwen/Qwen1.5-0.5B-Chat
+    python export.py --filepath="qwen1.5-7B-q80.bin" --dtype="q80" --model_type=Qwen/Qwen1.5-7B-Chat
     python export.py --filepath="qwen1.5-14B-q80.bin" --dtype="q80" --model_type=Qwen/Qwen1.5-14B-Chat
     python export.py --filepath="qwen1.5-32B-q80.bin" --dtype="q80" --model_type=Qwen/Qwen1.5-32B-Chat
     python export.py --filepath="qwen1.5-72B-q80.bin" --dtype="q80" --model_type=Qwen/Qwen1.5-72B-Chat

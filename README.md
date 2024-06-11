@@ -20,9 +20,12 @@ MHA
 
 ## 量化
 ### Vector-wise Quantization
-weight int8
+W8A16
 
-weight int4
+W4A16
+
+## batch
+naive batch / static batch
 
 # TODO
 ## kv cache
@@ -32,6 +35,9 @@ paged attention
 ## 量化
 
 activation 量化
+
+## batch
+continuous batch / in-flight batch
 
 # openai api server
 
@@ -50,7 +56,7 @@ curl http://127.0.0.1:8000/v1/chat/completions \
             },
             {
                 "role": "user",
-                "content": "Hello!"
+                "content": "天空为什么是蓝色的?"
             }
         ]
     }'
