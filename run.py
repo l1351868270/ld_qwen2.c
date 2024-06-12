@@ -233,6 +233,7 @@ def parse_args():
 
 if __name__ == '__main__':
     # python run.py -p "天空为什么是蓝色的" "天空为什么是蓝色的" "天空为什么是蓝色的" "天空为什么是蓝色的" "天空为什么是蓝色的" "天空为什么是蓝色的" "天空为什么是蓝色的" "天空为什么是蓝色的" "天空为什么是蓝色的" "天空为什么是蓝色的" "天空为什么是蓝色的" "天空为什么是蓝色的" "天空为什么是蓝色的" "天空为什么是蓝色的" "天空为什么是蓝色的" "天空为什么是蓝色的" --batch 16
+    # python run.py -p "天空为什么是蓝色的" -m "Qwen/Qwen1.5-32B-Chat" -q q40 --batch 1
     args = parse_args()
     model_type = args.model_type
     quantization_type = args.quantization_type

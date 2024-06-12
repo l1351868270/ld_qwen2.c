@@ -18,3 +18,5 @@ __pycache__
 data
 flagged
 
+qwen2_cublas_W8A8.cu
+scripts/

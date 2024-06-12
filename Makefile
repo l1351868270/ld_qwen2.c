@@ -9,6 +9,9 @@ cublas_W16A16: qwen2_cublas_W16A16.cu
 cublas_W8A16: qwen2_cublas_W8A16.cu
 	$(CC) --shared -Xcompiler -fPIC -o qwen2_q80.so -O3 qwen2_cublas_W8A16.cu -lm -lcublas -lcublasLt -gencode arch=compute_80,code=sm_80 
 
+cublas_W8A8: qwen2_cublas_W8A8.cu
+	$(CC) --shared -Xcompiler -fPIC -o qwen2_q80.so -O3 qwen2_cublas_W8A8.cu -lm -lcublas -lcublasLt -gencode arch=compute_80,code=sm_80 
+
 v2: qwen2_v2.cu
 	$(CC) --shared -Xcompiler -fPIC -o qwen2_fp16.so -O3 qwen2_v2.cu -lm -lcublas -lcublasLt -gencode arch=compute_80,code=sm_80
 

@@ -1,11 +1,12 @@
 import argparse
 import struct
 from typing import Union, Optional
-from transformers import AutoModelForCausalLM, AutoConfig, Qwen2ForCausalLM
+from transformers import AutoModelForCausalLM, AutoConfig, Qwen2ForCausalLM, Qwen2Config
 from accelerate import init_empty_weights, infer_auto_device_map, disk_offload
 import torch
 import numpy as np
 import gc
+import torch.nn as nn
 
 MODEL_LIANMENT = 16
 
@@ -240,383 +241,384 @@ def q40_write_layer_key_2d(model_sd, format_str, num_hidden_layers, width, heigh
         # print(f"{format_str.format(i)} quantized {tuple(s.shape)} to Q4_0 with max error {err}")
 
 
-def fp16_write_model(model, filename):
-    print(f"write model to {filename}, the keys of model is {len(model.state_dict())}")
-    config = model.config
-    with open(filename, "wb") as file:
-        write_header(config, file)
+def fp16_write_model(model, config, file, partial_id):
+    sd = model.state_dict()
 
-        sd = model.state_dict()
-
-        keys_len = 0
+    if partial_id == 0:
         # embedder 4
         ll = config.hidden_size * config.vocab_size
         fp16_write_single_key(sd, "model.embed_tokens.weight", ll, file) # [hidden_size, vocab_size] [151936, 1024]
-        keys_len += 1
 
-        num_heads = config.num_attention_heads
-        head_dim = config.hidden_size // num_heads
+    num_heads = config.num_attention_heads
+    head_dim = config.hidden_size // num_heads
 
+    if partial_id == 1:
         ll = config.num_hidden_layers * config.hidden_size * (num_heads * head_dim)
         # print(f"ll={ll}")
         fp16_write_layer_key(sd, config.num_hidden_layers, "model.layers.{}.self_attn.q_proj.weight", ll, file)
-        keys_len += config.num_hidden_layers
 
         ll = config.num_hidden_layers * (num_heads * head_dim)
         # print(f"ll={ll}")
         fp16_write_layer_key(sd, config.num_hidden_layers, "model.layers.{}.self_attn.q_proj.bias", ll, file)
-        keys_len += config.num_hidden_layers
 
+    if partial_id == 2:
         ll = config.num_hidden_layers * config.hidden_size * (config.num_key_value_heads * head_dim)
         # print(f"ll={ll}")
         fp16_write_layer_key(sd, config.num_hidden_layers, "model.layers.{}.self_attn.k_proj.weight", ll, file)
-        keys_len += config.num_hidden_layers
 
         ll = config.num_hidden_layers * (config.num_key_value_heads * head_dim)
         # print(f"ll={ll}")
         fp16_write_layer_key(sd, config.num_hidden_layers, "model.layers.{}.self_attn.k_proj.bias", ll, file)
-        keys_len += config.num_hidden_layers
 
+    if partial_id == 3:
         ll = config.num_hidden_layers * config.hidden_size * (config.num_key_value_heads * head_dim)
         # print(f"ll={ll}")
         fp16_write_layer_key(sd, config.num_hidden_layers, "model.layers.{}.self_attn.v_proj.weight", ll, file)
-        keys_len += config.num_hidden_layers
 
         ll = config.num_hidden_layers * (config.num_key_value_heads * head_dim)
         # print(f"ll={ll}")
         fp16_write_layer_key(sd, config.num_hidden_layers, "model.layers.{}.self_attn.v_proj.bias", ll, file)
-        keys_len += config.num_hidden_layers
 
-
+    if partial_id == 4:
         ll = config.num_hidden_layers * (num_heads * head_dim) * config.hidden_size
         # print(f"ll={ll}")
         fp16_write_layer_key(sd, config.num_hidden_layers, "model.layers.{}.self_attn.o_proj.weight", ll, file)
-        keys_len += config.num_hidden_layers
 
+    if partial_id == 5:
         ll = config.num_hidden_layers * config.hidden_size * config.intermediate_size
         # print(f"ll={ll}")
         fp16_write_layer_key(sd, config.num_hidden_layers, "model.layers.{}.mlp.gate_proj.weight", ll, file)
-        keys_len += config.num_hidden_layers
 
+    if partial_id == 6:
         ll = config.num_hidden_layers * config.hidden_size * config.intermediate_size
         # print(f"ll={ll}")
         fp16_write_layer_key(sd, config.num_hidden_layers, "model.layers.{}.mlp.up_proj.weight", ll, file)
-        keys_len += config.num_hidden_layers
         
+    if partial_id == 7:
         ll = config.num_hidden_layers * config.intermediate_size * config.hidden_size
         # print(f"ll={ll}")
         fp16_write_layer_key(sd, config.num_hidden_layers, "model.layers.{}.mlp.down_proj.weight", ll, file)
-        keys_len += config.num_hidden_layers
 
+    if partial_id == 8:
         ll = config.num_hidden_layers * config.hidden_size
         # print(f"ll={ll}")
         fp16_write_layer_key(sd, config.num_hidden_layers, "model.layers.{}.input_layernorm.weight", ll, file)
-        keys_len += config.num_hidden_layers
 
+    if partial_id == 9:
         ll = config.num_hidden_layers * config.hidden_size
         # print(f"ll={ll}")
         fp16_write_layer_key(sd, config.num_hidden_layers, "model.layers.{}.post_attention_layernorm.weight", ll, file)
-        keys_len += config.num_hidden_layers
 
+    if partial_id == 10:
         ll = config.hidden_size
         fp16_write_single_key(sd, "model.norm.weight", ll, file)
-        keys_len += 1
 
+    if partial_id == 11:
         ll = config.vocab_size * config.hidden_size
         fp16_write_single_key(sd, "lm_head.weight", ll, file)
-        keys_len += 1
 
-        print(f"keys length: {keys_len}")
-        assert keys_len == len(model.state_dict())
 
 # Vector-wise Quantization
-def q80_write_model(model, filename):
-    print(f"write model to {filename}, the keys of model is {len(model.state_dict())}")
-    config = model.config
-    with open(filename, "wb") as file:
-        write_header(config, file)
-
-        sd = model.state_dict()
-
-        keys_len = 0
+def q80_write_model(model, config, file, partial_id):
+    sd = model.state_dict()
+    if partial_id == 0:
         # embedder 4
         ll = config.hidden_size * config.vocab_size
         fp16_write_single_key(sd, "model.embed_tokens.weight", ll, file) # [hidden_size, vocab_size] [151936, 1024]
-        keys_len += 1
 
-        num_heads = config.num_attention_heads
-        head_dim = config.hidden_size // num_heads
+    
+    num_heads = config.num_attention_heads
+    head_dim = config.hidden_size // num_heads
+
+    if partial_id == 1:
         ll = config.num_hidden_layers * config.hidden_size * (num_heads * head_dim)
         # print(f"ll={ll}")
         q80_write_layer_key_2d(sd, "model.layers.{}.self_attn.q_proj.weight", config.num_hidden_layers, config.hidden_size, num_heads * head_dim, file)
-        keys_len += config.num_hidden_layers
 
         ll = config.num_hidden_layers * (num_heads * head_dim)
         # print(f"ll={ll}")
         fp16_write_layer_key(sd, config.num_hidden_layers, "model.layers.{}.self_attn.q_proj.bias", ll, file)
-        keys_len += config.num_hidden_layers
 
+    if partial_id == 2:
         ll = config.num_hidden_layers * config.hidden_size * (config.num_key_value_heads * head_dim)
         # print(f"ll={ll}")
         q80_write_layer_key_2d(sd, "model.layers.{}.self_attn.k_proj.weight", config.num_hidden_layers, config.hidden_size, config.num_key_value_heads * head_dim, file)
-        keys_len += config.num_hidden_layers
 
         ll = config.num_hidden_layers * (config.num_key_value_heads * head_dim)
         # print(f"ll={ll}")
         fp16_write_layer_key(sd, config.num_hidden_layers, "model.layers.{}.self_attn.k_proj.bias", ll, file)
-        keys_len += config.num_hidden_layers
 
+    if partial_id == 3:
         ll = config.num_hidden_layers * config.hidden_size * (config.num_key_value_heads * head_dim)
         # print(f"ll={ll}")
         q80_write_layer_key_2d(sd, "model.layers.{}.self_attn.v_proj.weight", config.num_hidden_layers, config.hidden_size, config.num_key_value_heads * head_dim, file)
-        keys_len += config.num_hidden_layers
 
         ll = config.num_hidden_layers * (config.num_key_value_heads * head_dim)
         # print(f"ll={ll}")
         fp16_write_layer_key(sd, config.num_hidden_layers, "model.layers.{}.self_attn.v_proj.bias", ll, file)
-        keys_len += config.num_hidden_layers
 
+    if partial_id == 4:
         ll = config.num_hidden_layers * (num_heads * head_dim) * config.hidden_size
         # print(f"ll={ll}")
         q80_write_layer_key_2d(sd, "model.layers.{}.self_attn.o_proj.weight", config.num_hidden_layers, num_heads * head_dim, config.hidden_size, file)
-        keys_len += config.num_hidden_layers
 
+    if partial_id == 5:
         ll = config.num_hidden_layers * config.hidden_size * config.intermediate_size
         # print(f"ll={ll}")
         q80_write_layer_key_2d(sd, "model.layers.{}.mlp.gate_proj.weight", config.num_hidden_layers, config.hidden_size, config.intermediate_size, file)
-        keys_len += config.num_hidden_layers
 
+    if partial_id == 6:
         ll = config.num_hidden_layers * config.hidden_size * config.intermediate_size
         # print(f"ll={ll}")
         q80_write_layer_key_2d(sd, "model.layers.{}.mlp.up_proj.weight", config.num_hidden_layers, config.hidden_size, config.intermediate_size, file)
-        keys_len += config.num_hidden_layers
         
+    if partial_id == 7:
         ll = config.num_hidden_layers * config.intermediate_size * config.hidden_size
         # print(f"ll={ll}")
         q80_write_layer_key_2d(sd, "model.layers.{}.mlp.down_proj.weight", config.num_hidden_layers, config.intermediate_size, config.hidden_size, file)
-        keys_len += config.num_hidden_layers
 
+    if partial_id == 8:
         ll = config.num_hidden_layers * config.hidden_size
         # print(f"ll={ll}")
         fp16_write_layer_key(sd, config.num_hidden_layers, "model.layers.{}.input_layernorm.weight", ll, file)
-        keys_len += config.num_hidden_layers
 
+    if partial_id == 9:
         ll = config.num_hidden_layers * config.hidden_size
         # print(f"ll={ll}")
         fp16_write_layer_key(sd, config.num_hidden_layers, "model.layers.{}.post_attention_layernorm.weight", ll, file)
-        keys_len += config.num_hidden_layers
 
+    if partial_id == 10:
         ll = config.hidden_size
         fp16_write_single_key(sd, "model.norm.weight", ll, file)
-        keys_len += 1
 
+    if partial_id == 11:
         ll = config.vocab_size * config.hidden_size
         fp16_write_single_key(sd, "lm_head.weight", ll, file)
-        keys_len += 1
 
-        print(f"keys length: {keys_len}")
-        assert keys_len == len(model.state_dict())
 
 # Vector-wise Quantization
-def q40_write_model(model, filename):
-    print(f"write model to {filename}, the keys of model is {len(model.state_dict())}")
-    config = model.config
-    with open(filename, "wb") as file:
-        write_header(config, file)
-
-        sd = model.state_dict()
-
-        keys_len = 0
-        # embedder 4
+def q40_write_model(model, config, file, partial_id):
+    sd = model.state_dict()
+    
+    if partial_id == 0:
         ll = config.hidden_size * config.vocab_size
         fp16_write_single_key(sd, "model.embed_tokens.weight", ll, file) # [hidden_size, vocab_size] [151936, 1024]
-        keys_len += 1
 
-        num_heads = config.num_attention_heads
-        head_dim = config.hidden_size // num_heads
+    num_heads = config.num_attention_heads
+    head_dim = config.hidden_size // num_heads
+
+    if partial_id == 1:
         ll = config.num_hidden_layers * config.hidden_size * (num_heads * head_dim)
-        # print(f"ll={ll}")
         q40_write_layer_key_2d(sd, "model.layers.{}.self_attn.q_proj.weight", config.num_hidden_layers, config.hidden_size, num_heads * head_dim, file)
         
-        keys_len += config.num_hidden_layers
-
         ll = config.num_hidden_layers * (num_heads * head_dim)
         # print(f"ll={ll}")
         fp16_write_layer_key(sd, config.num_hidden_layers, "model.layers.{}.self_attn.q_proj.bias", ll, file)
-        keys_len += config.num_hidden_layers
 
+    if partial_id == 2:
         ll = config.num_hidden_layers * config.hidden_size * (config.num_key_value_heads * head_dim)
         # print(f"ll={ll}")
         q40_write_layer_key_2d(sd, "model.layers.{}.self_attn.k_proj.weight", config.num_hidden_layers, config.hidden_size, config.num_key_value_heads * head_dim, file)
-        keys_len += config.num_hidden_layers
 
         ll = config.num_hidden_layers * (config.num_key_value_heads * head_dim)
         # print(f"ll={ll}")
         fp16_write_layer_key(sd, config.num_hidden_layers, "model.layers.{}.self_attn.k_proj.bias", ll, file)
-        keys_len += config.num_hidden_layers
 
+    if partial_id == 3:
         ll = config.num_hidden_layers * config.hidden_size * (config.num_key_value_heads * head_dim)
         # print(f"ll={ll}")
         q40_write_layer_key_2d(sd, "model.layers.{}.self_attn.v_proj.weight", config.num_hidden_layers, config.hidden_size, config.num_key_value_heads * head_dim, file)
-        keys_len += config.num_hidden_layers
 
         ll = config.num_hidden_layers * (config.num_key_value_heads * head_dim)
         # print(f"ll={ll}")
         fp16_write_layer_key(sd, config.num_hidden_layers, "model.layers.{}.self_attn.v_proj.bias", ll, file)
-        keys_len += config.num_hidden_layers
 
+    if partial_id == 4:
         ll = config.num_hidden_layers * (num_heads * head_dim) * config.hidden_size
         # print(f"ll={ll}")
         q40_write_layer_key_2d(sd, "model.layers.{}.self_attn.o_proj.weight", config.num_hidden_layers, num_heads * head_dim, config.hidden_size, file)
-        keys_len += config.num_hidden_layers
 
+    if partial_id == 5:
         ll = config.num_hidden_layers * config.hidden_size * config.intermediate_size
         # print(f"ll={ll}")
         q40_write_layer_key_2d(sd, "model.layers.{}.mlp.gate_proj.weight", config.num_hidden_layers, config.hidden_size, config.intermediate_size, file)
-        keys_len += config.num_hidden_layers
 
+    if partial_id == 6:
         ll = config.num_hidden_layers * config.hidden_size * config.intermediate_size
         # print(f"ll={ll}")
         q40_write_layer_key_2d(sd, "model.layers.{}.mlp.up_proj.weight", config.num_hidden_layers, config.hidden_size, config.intermediate_size, file)
-        keys_len += config.num_hidden_layers
-        
+
+    if partial_id == 7:        
         ll = config.num_hidden_layers * config.intermediate_size * config.hidden_size
         # print(f"ll={ll}")
         q40_write_layer_key_2d(sd, "model.layers.{}.mlp.down_proj.weight", config.num_hidden_layers, config.intermediate_size, config.hidden_size, file)
-        keys_len += config.num_hidden_layers
 
+    if partial_id == 8:
         ll = config.num_hidden_layers * config.hidden_size
         # print(f"ll={ll}")
         fp16_write_layer_key(sd, config.num_hidden_layers, "model.layers.{}.input_layernorm.weight", ll, file)
-        keys_len += config.num_hidden_layers
 
+    if partial_id == 9:
         ll = config.num_hidden_layers * config.hidden_size
         # print(f"ll={ll}")
         fp16_write_layer_key(sd, config.num_hidden_layers, "model.layers.{}.post_attention_layernorm.weight", ll, file)
-        keys_len += config.num_hidden_layers
 
+    if partial_id == 10:
         ll = config.hidden_size
         fp16_write_single_key(sd, "model.norm.weight", ll, file)
-        keys_len += 1
 
+    if partial_id == 11:
         ll = config.vocab_size * config.hidden_size
         fp16_write_single_key(sd, "lm_head.weight", ll, file)
-        keys_len += 1
 
-        print(f"keys length: {keys_len}")
-        assert keys_len == len(model.state_dict())
+class PartialQwen2ForCausalLM(Qwen2ForCausalLM):
+    def __init__(self, config, partial_id):
+        super(PartialQwen2ForCausalLM, self).__init__(config)
 
-# Vector-wise Quantization
-def q40_write_model(model, filename):
-    print(f"write model to {filename}, the keys of model is {len(model.state_dict())}")
-    config = model.config
-    with open(filename, "wb") as file:
-        write_header(config, file)
+        if (partial_id == 0): # self.model.embed_tokens
+            self.model.layers = None
+            self.model.norm = None
+            self.lm_head = None
 
-        sd = model.state_dict()
+        if partial_id == 1: # self.model.layers[i].self_attn.q_proj
+            self.model.embed_tokens = None
+            for decoder_layer in self.model.layers:
+                decoder_layer.self_attn.k_proj = None
+                decoder_layer.self_attn.v_proj = None
+                decoder_layer.self_attn.o_proj = None
+                decoder_layer.self_attn.rotary_emb = None
+                decoder_layer.mlp = None
+                decoder_layer.input_layernorm = None
+                decoder_layer.post_attention_layernorm = None
+            self.model.norm = None
+            self.lm_head = None
 
-        keys_len = 0
-        # embedder 4
-        ll = config.hidden_size * config.vocab_size
-        fp16_write_single_key(sd, "model.embed_tokens.weight", ll, file) # [hidden_size, vocab_size] [151936, 1024]
-        keys_len += 1
+        if partial_id == 2: # self.model.layers[i].self_attn.k_proj
+            self.model.embed_tokens = None
+            for decoder_layer in self.model.layers:
+                decoder_layer.self_attn.q_proj = None
+                decoder_layer.self_attn.v_proj = None
+                decoder_layer.self_attn.o_proj = None
+                decoder_layer.self_attn.rotary_emb = None
+                decoder_layer.mlp = None
+                decoder_layer.input_layernorm = None
+                decoder_layer.post_attention_layernorm = None
+            self.model.norm = None
+            self.lm_head = None
 
-        num_heads = config.num_attention_heads
-        head_dim = config.hidden_size // num_heads
-        ll = config.num_hidden_layers * config.hidden_size * (num_heads * head_dim)
-        # print(f"ll={ll}")
-        q40_write_layer_key_2d(sd, "model.layers.{}.self_attn.q_proj.weight", config.num_hidden_layers, config.hidden_size, num_heads * head_dim, file)
+        if partial_id == 3: # self.model.layers[i].self_attn.v_proj
+            self.model.embed_tokens = None
+            for decoder_layer in self.model.layers:
+                decoder_layer.self_attn.q_proj = None
+                decoder_layer.self_attn.k_proj = None
+                decoder_layer.self_attn.o_proj = None
+                decoder_layer.self_attn.rotary_emb = None
+                decoder_layer.mlp = None
+                decoder_layer.input_layernorm = None
+                decoder_layer.post_attention_layernorm = None
+            self.model.norm = None
+            self.lm_head = None
+
+        if partial_id == 4: # self.model.layers[i].self_attn.o_proj
+            self.model.embed_tokens = None
+            for decoder_layer in self.model.layers:
+                decoder_layer.self_attn.q_proj = None
+                decoder_layer.self_attn.k_proj = None
+                decoder_layer.self_attn.v_proj = None
+                decoder_layer.self_attn.rotary_emb = None
+                decoder_layer.mlp = None
+                decoder_layer.input_layernorm = None
+                decoder_layer.post_attention_layernorm = None
+            self.model.norm = None
+            self.lm_head = None
+
+        if partial_id == 5: # self.model.layers[i].mlp.gate_proj
+            self.model.embed_tokens = None
+            for decoder_layer in self.model.layers:
+                decoder_layer.self_attn = None
+                decoder_layer.mlp.up_proj = None
+                decoder_layer.mlp.down_proj = None
+                decoder_layer.mlp.act_fn = None
+                decoder_layer.input_layernorm = None
+                decoder_layer.post_attention_layernorm = None
+            self.model.norm = None
+            self.lm_head = None
+
+        if partial_id == 6: # self.model.layers[i].mlp.up_proj
+            self.model.embed_tokens = None
+            for decoder_layer in self.model.layers:
+                decoder_layer.self_attn = None
+                decoder_layer.mlp.gate_proj = None
+                decoder_layer.mlp.down_proj = None
+                decoder_layer.mlp.act_fn = None
+                decoder_layer.input_layernorm = None
+                decoder_layer.post_attention_layernorm = None
+            self.model.norm = None
+            self.lm_head = None
+
+        if partial_id == 7: # self.model.layers[i].mlp.down_proj
+            self.model.embed_tokens = None
+            for decoder_layer in self.model.layers:
+                decoder_layer.self_attn = None
+                decoder_layer.mlp.gate_proj = None
+                decoder_layer.mlp.up_proj = None
+                decoder_layer.mlp.act_fn = None
+                decoder_layer.input_layernorm = None
+                decoder_layer.post_attention_layernorm = None
+            self.model.norm = None
+            self.lm_head = None
+
+        if partial_id == 8: # self.model.layers[i].input_layernorm
+            self.model.embed_tokens = None
+            for decoder_layer in self.model.layers:
+                decoder_layer.self_attn = None
+                decoder_layer.mlp = None
+                decoder_layer.post_attention_layernorm = None
+            self.model.norm = None
+            self.lm_head = None
+
+        if partial_id == 9: # self.model.layers[i].post_attention_layernorm
+            self.model.embed_tokens = None
+            for decoder_layer in self.model.layers:
+                decoder_layer.self_attn = None
+                decoder_layer.mlp = None
+                decoder_layer.input_layernorm = None
+            self.model.norm = None
+            self.lm_head = None
+
+        if partial_id == 10: # self.model.norm
+            self.model.embed_tokens = None
+            for decoder_layer in self.model.layers:
+                decoder_layer.self_attn = None
+                decoder_layer.mlp = None
+                decoder_layer.input_layernorm = None
+                decoder_layer.post_attention_layernorm = None
+            self.lm_head = None
+
+        if partial_id == 11: # self.model.lm_head
+            # self.model.embed_tokens = None
+            for decoder_layer in self.model.layers:
+                decoder_layer.self_attn = None
+                decoder_layer.mlp = None
+                decoder_layer.input_layernorm = None
+                decoder_layer.post_attention_layernorm = None
+            self.model.norm = None
         
-        keys_len += config.num_hidden_layers
-
-        ll = config.num_hidden_layers * (num_heads * head_dim)
-        # print(f"ll={ll}")
-        fp16_write_layer_key(sd, config.num_hidden_layers, "model.layers.{}.self_attn.q_proj.bias", ll, file)
-        keys_len += config.num_hidden_layers
-
-        ll = config.num_hidden_layers * config.hidden_size * (config.num_key_value_heads * head_dim)
-        # print(f"ll={ll}")
-        q40_write_layer_key_2d(sd, "model.layers.{}.self_attn.k_proj.weight", config.num_hidden_layers, config.hidden_size, config.num_key_value_heads * head_dim, file)
-        keys_len += config.num_hidden_layers
-
-        ll = config.num_hidden_layers * (config.num_key_value_heads * head_dim)
-        # print(f"ll={ll}")
-        fp16_write_layer_key(sd, config.num_hidden_layers, "model.layers.{}.self_attn.k_proj.bias", ll, file)
-        keys_len += config.num_hidden_layers
-
-        ll = config.num_hidden_layers * config.hidden_size * (config.num_key_value_heads * head_dim)
-        # print(f"ll={ll}")
-        q40_write_layer_key_2d(sd, "model.layers.{}.self_attn.v_proj.weight", config.num_hidden_layers, config.hidden_size, config.num_key_value_heads * head_dim, file)
-        keys_len += config.num_hidden_layers
-
-        ll = config.num_hidden_layers * (config.num_key_value_heads * head_dim)
-        # print(f"ll={ll}")
-        fp16_write_layer_key(sd, config.num_hidden_layers, "model.layers.{}.self_attn.v_proj.bias", ll, file)
-        keys_len += config.num_hidden_layers
-
-        ll = config.num_hidden_layers * (num_heads * head_dim) * config.hidden_size
-        # print(f"ll={ll}")
-        q40_write_layer_key_2d(sd, "model.layers.{}.self_attn.o_proj.weight", config.num_hidden_layers, num_heads * head_dim, config.hidden_size, file)
-        keys_len += config.num_hidden_layers
-
-        ll = config.num_hidden_layers * config.hidden_size * config.intermediate_size
-        # print(f"ll={ll}")
-        q40_write_layer_key_2d(sd, "model.layers.{}.mlp.gate_proj.weight", config.num_hidden_layers, config.hidden_size, config.intermediate_size, file)
-        keys_len += config.num_hidden_layers
-
-        ll = config.num_hidden_layers * config.hidden_size * config.intermediate_size
-        # print(f"ll={ll}")
-        q40_write_layer_key_2d(sd, "model.layers.{}.mlp.up_proj.weight", config.num_hidden_layers, config.hidden_size, config.intermediate_size, file)
-        keys_len += config.num_hidden_layers
-        
-        ll = config.num_hidden_layers * config.intermediate_size * config.hidden_size
-        # print(f"ll={ll}")
-        q40_write_layer_key_2d(sd, "model.layers.{}.mlp.down_proj.weight", config.num_hidden_layers, config.intermediate_size, config.hidden_size, file)
-        keys_len += config.num_hidden_layers
-
-        ll = config.num_hidden_layers * config.hidden_size
-        # print(f"ll={ll}")
-        fp16_write_layer_key(sd, config.num_hidden_layers, "model.layers.{}.input_layernorm.weight", ll, file)
-        keys_len += config.num_hidden_layers
-
-        ll = config.num_hidden_layers * config.hidden_size
-        # print(f"ll={ll}")
-        fp16_write_layer_key(sd, config.num_hidden_layers, "model.layers.{}.post_attention_layernorm.weight", ll, file)
-        keys_len += config.num_hidden_layers
-
-        ll = config.hidden_size
-        fp16_write_single_key(sd, "model.norm.weight", ll, file)
-        keys_len += 1
-
-        ll = config.vocab_size * config.hidden_size
-        fp16_write_single_key(sd, "lm_head.weight", ll, file)
-        keys_len += 1
-
-        print(f"keys length: {keys_len}")
-        assert keys_len == len(model.state_dict())
-
 
 if __name__ == "__main__":
     '''
-    python export.py --filepath="qwen1.5-0.5B.bin" --dtype="fp16" --model_type=Qwen/Qwen1.5-0.5B-Chat
-    python export.py --filepath="qwen1.5-1.8B.bin" --dtype="fp16" --model_type=Qwen/Qwen1.5-1.8B-Chat
-    python export.py --filepath="qwen1.5-4B.bin" --dtype="fp16" --model_type=Qwen/Qwen1.5-4B-Chat
-    python export.py --filepath="qwen1.5-14B.bin" --dtype="fp16" --model_type=Qwen/Qwen1.5-14B-Chat
-    python export.py --filepath="qwen1.5-14B.bin" --dtype="fp16" --model_type=Qwen/Qwen1.5-14B-Chat
-    python export.py --filepath="qwen1.5-32B.bin" --dtype="fp16" --model_type=Qwen/Qwen1.5-32B-Chat
+    python export_72B.py --filepath="qwen1.5-72B.bin" --dtype="fp16" --model_type=Qwen/Qwen1.5-72B-Chat
+    python export_72B.py --filepath="qwen1.5-72B-q80.bin" --dtype="q80" --model_type=Qwen/Qwen1.5-72B-Chat
+    python export_72B.py --filepath="qwen1.5-72B-q40.bin" --dtype="q40" --model_type=Qwen/Qwen1.5-72B-Chat
 
-    python export.py --filepath="qwen1.5-0.5B.bin" --dtype="fp16" --model_type="Qwen/Qwen2-0.5B-Instruct"
+    python export_72B.py --filepath="qwen1.5-32B-q40.bin" --dtype="q40" --model_type=Qwen/Qwen1.5-32B-Chat
+    python export_72B.py --filepath="qwen1.5-14B-q40.bin" --dtype="q40" --model_type=Qwen/Qwen1.5-14B-Chat
 
-    python export.py --filepath="qwen1.5-0.5B-q80.bin" --dtype="q80" --model_type=Qwen/Qwen1.5-0.5B-Chat
-    python export.py --filepath="qwen1.5-7B-q80.bin" --dtype="q80" --model_type=Qwen/Qwen1.5-7B-Chat
-    python export.py --filepath="qwen1.5-14B-q80.bin" --dtype="q80" --model_type=Qwen/Qwen1.5-14B-Chat
-    python export.py --filepath="qwen1.5-32B-q80.bin" --dtype="q80" --model_type=Qwen/Qwen1.5-32B-Chat
-    python export.py --filepath="qwen1.5-72B-q80.bin" --dtype="q80" --model_type=Qwen/Qwen1.5-72B-Chat
+    python export_72B.py --filepath="qwen1.5-0.5B-q40.bin" --dtype="q40" --model_type=Qwen/Qwen1.5-0.5B-Chat
+    python export_72B.py --filepath="qwen1.5-0.5B-q40.bin" --dtype="q40" --model_type=Qwen/Qwen1.5-0.5B-Chat
+    python export_72B.py --filepath="qwen1.5-0.5B-q80.bin" --dtype="q80" --model_type=Qwen/Qwen1.5-0.5B-Chat
 
-    python export.py --filepath="qwen1.5-0.5B-q40.bin" --dtype="q40" --model_type=Qwen/Qwen1.5-0.5B-Chat
-    python export.py --filepath="qwen1.5-14B-q40.bin" --dtype="q40" --model_type=Qwen/Qwen1.5-14B-Chat
-    python export.py --filepath="qwen1.5-32B-q40.bin" --dtype="q40" --model_type=Qwen/Qwen1.5-32B-Chat
-    python export.py --filepath="qwen1.5-72B-q40.bin" --dtype="q40" --model_type=Qwen/Qwen1.5-72B-Chat
+    python export_72B.py --filepath="qwen2-72B-q80.bin" --dtype="q80" --model_type="Qwen/Qwen2-72B-Instruct"
     '''
     parser = argparse.ArgumentParser()
     parser.add_argument("--filepath", type=str, default="qwen1.5-0.5B.bin")
@@ -627,24 +629,45 @@ if __name__ == "__main__":
     print("loading weights from pretrained qwen1.5: %s" % model_type)
 
     config = AutoConfig.from_pretrained(model_type)
-    with init_empty_weights():
-        model = Qwen2ForCausalLM(config)
-    device_map = infer_auto_device_map(model, max_memory={0: "0GB", "cpu": "200GB"}, verbose=True)
-    print(device_map)
 
-    model = AutoModelForCausalLM.from_pretrained(model_type, torch_dtype=torch.float16, trust_remote_code=True, device_map=device_map)
-
-    # print(model)
-    sd = model.state_dict()
-    # print(sd.keys())
-    config = model.config
-    # print(config)
+    # sd = model.state_dict()
+    # # print(sd.keys())
+    # config = model.config
+    # # print(config)
     dtype = args.dtype
     filepath = args.filepath
     print(f"dtype:{dtype} filepath:{filepath}")
+
     if (dtype == "fp16"):
-        fp16_write_model(model, filepath)
+        with open(filepath, "wb") as file:
+            write_header(config, file)
+            for i in range(0, 12):
+                with init_empty_weights():
+                    model = PartialQwen2ForCausalLM(config, i)
+                    device_map = infer_auto_device_map(model, max_memory={0: "0GB", "cpu": "100GB", "disk": "0GB"}, verbose=True)
+                    print(device_map)
+                model = model.from_pretrained(model_type, i, torch_dtype=torch.float16, device_map=device_map)
+                fp16_write_model(model, config, file, i)
+
     if (dtype == "q80"):
-        q80_write_model(model, filepath)
+        with open(filepath, "wb") as file:
+            write_header(config, file)
+            for i in range(0, 12):
+                with init_empty_weights():
+                    model = PartialQwen2ForCausalLM(config, i)
+                    device_map = infer_auto_device_map(model, max_memory={0: "0GB", "cpu": "100GB", "disk": "0GB"}, verbose=True)
+                    print(device_map)
+                model = model.from_pretrained(model_type, i, torch_dtype=torch.float16, device_map=device_map)
+                q80_write_model(model, config, file, i)
+
     if (dtype == "q40"):
-        q40_write_model(model, filepath)
+        with open(filepath, "wb") as file:
+            write_header(config, file)
+            for i in range(0, 12):
+                gc.collect()
+                with init_empty_weights():
+                    model = PartialQwen2ForCausalLM(config, i)
+                    device_map = infer_auto_device_map(model, max_memory={0: "0GB", "cpu": "100GB", "disk": "0GB"}, verbose=True)
+                    print(device_map)
+                model = model.from_pretrained(model_type, i, torch_dtype=torch.float16, device_map=device_map)
+                q40_write_model(model, config, file, i)
