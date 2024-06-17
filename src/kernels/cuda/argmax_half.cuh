@@ -45,7 +45,7 @@ void argmax_half_fwd(int* output, half* input, int dim) {
         printf("argmax:\n");
         printf("[");
         for (int b = 0; b < batch; b++) {
-            printf("%d, ", output[b]);
+            printf("%d, %f; ", output[b], __half2float( input[b * dim + output[b]]));
         }
         printf("]\n");
     }

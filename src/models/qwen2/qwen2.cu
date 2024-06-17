@@ -1,5 +1,5 @@
 /*
-make cublas_W16A16
+make qwen2
 python run.py --model_type=Qwen/Qwen1.5-0.5B-Chat --prompt="天空为什么是蓝色的,答案大于1000字"
 */
 
@@ -13,7 +13,6 @@ python run.py --model_type=Qwen/Qwen1.5-0.5B-Chat --prompt="天空为什么是�
 #include <cuda_fp16.h>
 #include <unistd.h>
 #include <sys/mman.h>
-#include "./dev/cuda/gemv_fwd/gemv_fast_fwd.cu"
 #include <cublas_v2.h>
 #include <cublasLt.h>
 #include "./src/kernels/cuda/embedding.cuh"
@@ -165,6 +164,15 @@ void free_run_state(RunState* s) {
     cudaFree(s->token);
     free(s->next_cpu);
 }
+
+// void parse_ll(char** ptr, unsigned long long *ll, unsigned long long *ll_bytes) {
+//     cudaMemcpy(ll, *ptr, sizeof(unsigned long long), cudaMemcpyDeviceToHost);
+//     *ptr += sizeof(unsigned long long);
+//     cudaMemcpy(ll_bytes, ptr, sizeof(unsigned long long), cudaMemcpyDeviceToHost);
+//     *ptr += sizeof(unsigned long long);
+//     printf("++++++++++++--------%llu\n", ll);
+//     printf("++++++++++++--------%llu\n", ll_bytes);
+// }
 
 void memory_map_weights(Qwen2Weights *w, Qwen2Config* p, char* ptr) {
     unsigned long long ll;
@@ -454,6 +462,7 @@ void* qwen2_forward(Context *ctx, cublasHandle_t *handle, Qwen2* qwen2, int *tok
     // printf("qwen2_forward pos:%d, batch:%d, hidden_size:%d \n", pos, batch, hidden_size);
     cudaError_t err;
     ld_infer::embedding::embedding_fwd_launch<half>(s->half_x, w->embed_tokens, token, batch, hidden_size);
+
     err = cudaGetLastError();
     if (err != cudaSuccess) {
         printf("%s\n", cudaGetErrorName(err));
@@ -464,6 +473,7 @@ void* qwen2_forward(Context *ctx, cublasHandle_t *handle, Qwen2* qwen2, int *tok
     for(int l = 0; l < p->num_hidden_layers; l++) {
         // attn_norm
         ld_infer::rmsnorm_half::rmsnorm_fwd_launch(s->half_xb, s->half_x, w->input_layernorm + l*hidden_size, rms_norm_eps, batch, hidden_size);
+
         int offset_k = l * max_seq_len * batch * num_key_value_heads * head_dim 
                          + pos * batch * num_key_value_heads * head_dim;
         int offset_v = l * max_seq_len * batch * num_key_value_heads * head_dim 
@@ -485,16 +495,19 @@ void* qwen2_forward(Context *ctx, cublasHandle_t *handle, Qwen2* qwen2, int *tok
                              batch, num_heads, num_key_value_heads, head_dim, num_heads, num_key_value_heads, max_seq_len, 
                              num_hidden_layers, l, pos);
 
+
+
         ld_infer::linear_half::linear_fwd_launch(s->handle, s->half_xb2, s->half_xb, w->o_proj + l * (num_heads * head_dim) * hidden_size, NULL, batch, num_heads * head_dim, hidden_size);
 
         ld_infer::residual_half::residual_fwd_launch(s->half_x, s->half_xb2, batch, hidden_size);
+
         // ffn_norm
         ld_infer::rmsnorm_half::rmsnorm_fwd_launch(s->half_xb, s->half_x, w->post_attention_layernorm + l*hidden_size, rms_norm_eps, batch, hidden_size);
         ld_infer::linear_half::linear_fwd_launch(s->handle, s->half_hb, s->half_xb, w->gate_proj + l*intermediate_size*hidden_size, NULL, batch, hidden_size, intermediate_size);
         ld_infer::linear_half::linear_fwd_launch(s->handle, s->half_hb2, s->half_xb, w->up_proj + l*intermediate_size*hidden_size, NULL, batch, hidden_size, intermediate_size);
 
         ld_infer::silu_half::silu_fwd_launch(s->half_hb, s->half_hb2, batch, intermediate_size);
-        
+
         ld_infer::linear_half::linear_fwd_launch(s->handle, s->half_xb, s->half_hb, w->down_proj + l* hidden_size * intermediate_size, NULL, batch, intermediate_size, hidden_size);
                 
         ld_infer::residual_half::residual_fwd_launch(s->half_x, s->half_xb, batch, hidden_size);
@@ -503,7 +516,7 @@ void* qwen2_forward(Context *ctx, cublasHandle_t *handle, Qwen2* qwen2, int *tok
     }
     
     ld_infer::rmsnorm_half::rmsnorm_fwd_launch(s->half_x, s->half_x, w->norm, rms_norm_eps, batch, hidden_size);
-    ld_infer::linear_half::linear_fwd_launch(s->handle, s->half_logits, s->half_x, w->lm_head, NULL, batch, hidden_size, vocab_size);
+    ld_infer::linear_half::linear_fwd_launch1(s->handle, s->half_logits, s->half_x, w->lm_head, NULL, batch, hidden_size, vocab_size);
 
     return s->half_logits;
 }
@@ -544,7 +557,11 @@ int* c_qwen2_forward(int batch, int seq_len, int *data, int pos) {
     qwen2_forward(&ctx, s->handle, &py_model, s->token, batch, pos);
     // cudaDeviceSynchronize();
     ld_infer::argmax_half::argmax_fwd_launch(s->next, s->half_logits, s->batch, py_model.config.vocab_size);
-    cudaDeviceSynchronize();
+
+        // if (pos == 10) {
+        //     cudaDeviceSynchronize();
+        //     exit(1);
+        // }
 
     for (int i = 0; i < s->batch; i++) {
         cudaMemcpy(s->next_cpu + i, s->next + i, sizeof(int), cudaMemcpyDeviceToHost);

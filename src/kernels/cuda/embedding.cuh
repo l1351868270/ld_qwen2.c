@@ -21,19 +21,23 @@ void embedding_fwd(T *x, T* embed_tokens, int *token, int dim) {
     int offset_t = bidy * blockDim.x + tidx;
     x[offset_x] = *(embed_tokens + token[bidx] * dim + offset_t);
 
-    // if (thread0()) {
-    //     int batch = gridDim.x;
-    //     printf("[");
-    //     for (int b = 0; b < batch; b++) {
-    //         int offset_x = b * dim;
-    //         printf("[");
-    //         for (int i = 0; i<dim; i++) {
-    //             printf("%f, ", __half2float(x[offset_x + i]));
-    //         }
-    //         printf("],\n");
-    //     }
-    //     printf("]\n");
-    // }
+#ifdef EMBEDDING_DEBUG
+    if (thread0()) {
+        printf("token[b]:%d \n", token[0]);
+        int batch = gridDim.x;
+        printf("[");
+        for (int b = 0; b < batch; b++) {
+            int offset_x = b * dim;
+            printf("[");
+            for (int i = 0; i<dim; i++) {
+                printf("%f, ", __half2float(x[offset_x + i]));
+            }
+            printf("],\n");
+        }
+        printf("]\n");
+    }
+#endif // EMBEDDING_DEBUG
+
 }
 
 template <all T>

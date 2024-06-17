@@ -43,7 +43,7 @@ void rope_fwd(half *q, float rope_freq_constant, int num_heads, int head_dim, in
             printf("],\n");
         }
     }
-    #endif // CUDA_DEBUG
+    #endif // ROPE_DEBUG
 }
 
 void rope_launch(half *q, float rope_theta, int batch, int num_heads, int head_dim, int pos) {

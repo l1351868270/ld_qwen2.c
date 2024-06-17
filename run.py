@@ -12,12 +12,26 @@ from ctypes import c_int, c_char_p, POINTER, create_string_buffer
 class CLDQwen2:
     def __init__(self, model_type: str, quantization_type: str, batch: int, max_seq_len: int):
         self.qwen2_path = os.path.dirname(os.path.abspath(__file__))
+        if quantization_type == "fp32":
+            self.qwen2lib = CDLL(os.path.join(self.qwen2_path, "./qwen2_fp32.so"))
         if quantization_type == "fp16":
             self.qwen2lib = CDLL(os.path.join(self.qwen2_path, "./qwen2_fp16.so"))
         if quantization_type == "q80":
             self.qwen2lib = CDLL(os.path.join(self.qwen2_path, "./qwen2_q80.so"))
         if quantization_type == "q40":
             self.qwen2lib = CDLL(os.path.join(self.qwen2_path, "./qwen2_q40.so"))
+
+        if quantization_type == "fp32":
+            if model_type == "Qwen/Qwen1.5-0.5B-Chat":
+                self.checkpoint_path = os.path.join(self.qwen2_path, "qwen1.5-0.5B-fp32.bin")
+            if model_type == "Qwen/Qwen1.5-1.8B-Chat":
+                self.checkpoint_path = os.path.join(self.qwen2_path, "qwen1.5-1.8B-fp32.bin")
+            if model_type == "Qwen/Qwen1.5-4B-Chat":
+                self.checkpoint_path = os.path.join(self.qwen2_path, "qwen1.5-4B-fp32.bin")
+            if model_type == "Qwen/Qwen1.5-7B-Chat":
+                self.checkpoint_path = os.path.join(self.qwen2_path, "qwen1.5-7B-fp32.bin")
+            if model_type == "Qwen/Qwen1.5-14B-Chat":
+                self.checkpoint_path = os.path.join(self.qwen2_path, "qwen1.5-14B-fp32.bin")
 
         if quantization_type == "fp16":
             if model_type == "Qwen/Qwen1.5-0.5B-Chat":
@@ -200,8 +214,7 @@ class CLDQwen2:
 
             # print(f"tokenized_prompt_c: {tokenized_prompt_c}")
             next = self.qwen2_forward(tokenized_prompt_c, self.batch, pos)
-            
-
+ 
             if pos >= seq_len:
                 for i in range(self.batch):
                     if next[i] in self.stop_token_ids:
@@ -225,7 +238,7 @@ class CLDQwen2:
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("-m", "--model_type", type=str, default="Qwen/Qwen1.5-0.5B-Chat")
-    parser.add_argument("-q", "--quantization_type", choices=("fp16", "q80", "q40"), type=str, default="fp16")
+    parser.add_argument("-q", "--quantization_type", choices=("fp32", "fp16", "q80", "q40"), type=str, default="fp16")
     parser.add_argument("-p", "--prompt", nargs='+', type=str, default="Give me a short introduction to large language model.")
     parser.add_argument("--max_seq_len", type=int, default=256)
     parser.add_argument("--batch", type=int, default=1)
@@ -243,6 +256,8 @@ if __name__ == '__main__':
 
     model = CLDQwen2(model_type, quantization_type, batch, max_seq_len)
     model.init()
+    tmp = model.tokenizer.decode([105681], skip_special_tokens=True,)
+    print(tmp)
 
     print("="*50)
     print("user:")
@@ -256,7 +271,7 @@ if __name__ == '__main__':
     # print(tokenized_prompts, seq_len)
     # print("tokenized_prompts:")
     tokenized_prompts, seq_len = model.tokenized_prompts(prompt)
-    # print(tokenized_prompts, seq_len)
+    print(tokenized_prompts, seq_len)
     # print("tokenized_prompts_v1:")
     # tokenized_prompts, seq_len = model.tokenized_prompts_v1(prompt)
     # print(tokenized_prompts, seq_len)

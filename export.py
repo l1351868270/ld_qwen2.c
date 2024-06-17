@@ -143,6 +143,31 @@ def write_header(config, file):
             head_bytes += MODEL_LIANMENT - head_bytes % MODEL_LIANMENT
             file.write(struct.pack("x" * (MODEL_LIANMENT - head_bytes % MODEL_LIANMENT)))
 
+def fp32_write_single_key(model_sd, key, ll, file):
+    file.write(struct.pack("Q", ll))
+    ll_bytes = ll * 4
+    if (ll_bytes % MODEL_LIANMENT != 0):
+        ll_bytes += MODEL_LIANMENT - ll_bytes % MODEL_LIANMENT
+    file.write(struct.pack("Q", ll_bytes))
+    write_fp32(model_sd[key], file)
+    # print(model_sd[key])
+    # print(model_sd["model.embed_tokens.weight"].shape)
+    if (ll_bytes % MODEL_LIANMENT != 0):
+        file.write(struct.pack("x" * (MODEL_LIANMENT - ll_bytes % MODEL_LIANMENT)))
+
+
+def fp32_write_layer_key(model_sd, num_hidden_layers, format_str, ll, file):
+    file.write(struct.pack("Q", ll))
+    ll_bytes = ll * 4
+    if (ll_bytes % MODEL_LIANMENT != 0):
+        ll_bytes += MODEL_LIANMENT - ll_bytes % MODEL_LIANMENT
+    file.write(struct.pack("Q", ll_bytes))
+    for i in range(num_hidden_layers): 
+        write_fp32(model_sd[format_str.format(i)], file) # [hidden_size, num_heads * head_dim] [1024, 1024]
+            # print(sd[f"model.layers.{i}.self_attn.q_proj.weight"].shape)
+    if (ll_bytes % MODEL_LIANMENT != 0):
+        file.write(struct.pack("x" * (MODEL_LIANMENT - ll_bytes % MODEL_LIANMENT)))
+
 
 def fp16_write_single_key(model_sd, key, ll, file):
     file.write(struct.pack("Q", ll))
@@ -238,6 +263,96 @@ def q40_write_layer_key_2d(model_sd, format_str, num_hidden_layers, width, heigh
         del(model_sd[format_str.format(i)])
         gc.collect()
         # print(f"{format_str.format(i)} quantized {tuple(s.shape)} to Q4_0 with max error {err}")
+
+
+def fp32_write_model(model, filename):
+    print(f"write model to {filename}, the keys of model is {len(model.state_dict())}")
+    config = model.config
+    with open(filename, "wb") as file:
+        write_header(config, file)
+
+        sd = model.state_dict()
+
+        keys_len = 0
+        # embedder 4
+        ll = config.hidden_size * config.vocab_size
+        fp32_write_single_key(sd, "model.embed_tokens.weight", ll, file) # [hidden_size, vocab_size] [151936, 1024]
+        keys_len += 1
+
+        num_heads = config.num_attention_heads
+        head_dim = config.hidden_size // num_heads
+
+        ll = config.num_hidden_layers * config.hidden_size * (num_heads * head_dim)
+        # print(f"ll={ll}")
+        fp32_write_layer_key(sd, config.num_hidden_layers, "model.layers.{}.self_attn.q_proj.weight", ll, file)
+        keys_len += config.num_hidden_layers
+
+        ll = config.num_hidden_layers * (num_heads * head_dim)
+        # print(f"ll={ll}")
+        fp32_write_layer_key(sd, config.num_hidden_layers, "model.layers.{}.self_attn.q_proj.bias", ll, file)
+        keys_len += config.num_hidden_layers
+
+        ll = config.num_hidden_layers * config.hidden_size * (config.num_key_value_heads * head_dim)
+        # print(f"ll={ll}")
+        fp32_write_layer_key(sd, config.num_hidden_layers, "model.layers.{}.self_attn.k_proj.weight", ll, file)
+        keys_len += config.num_hidden_layers
+
+        ll = config.num_hidden_layers * (config.num_key_value_heads * head_dim)
+        # print(f"ll={ll}")
+        fp32_write_layer_key(sd, config.num_hidden_layers, "model.layers.{}.self_attn.k_proj.bias", ll, file)
+        keys_len += config.num_hidden_layers
+
+        ll = config.num_hidden_layers * config.hidden_size * (config.num_key_value_heads * head_dim)
+        # print(f"ll={ll}")
+        fp32_write_layer_key(sd, config.num_hidden_layers, "model.layers.{}.self_attn.v_proj.weight", ll, file)
+        keys_len += config.num_hidden_layers
+
+        ll = config.num_hidden_layers * (config.num_key_value_heads * head_dim)
+        # print(f"ll={ll}")
+        fp32_write_layer_key(sd, config.num_hidden_layers, "model.layers.{}.self_attn.v_proj.bias", ll, file)
+        keys_len += config.num_hidden_layers
+
+
+        ll = config.num_hidden_layers * (num_heads * head_dim) * config.hidden_size
+        # print(f"ll={ll}")
+        fp32_write_layer_key(sd, config.num_hidden_layers, "model.layers.{}.self_attn.o_proj.weight", ll, file)
+        keys_len += config.num_hidden_layers
+
+        ll = config.num_hidden_layers * config.hidden_size * config.intermediate_size
+        # print(f"ll={ll}")
+        fp32_write_layer_key(sd, config.num_hidden_layers, "model.layers.{}.mlp.gate_proj.weight", ll, file)
+        keys_len += config.num_hidden_layers
+
+        ll = config.num_hidden_layers * config.hidden_size * config.intermediate_size
+        # print(f"ll={ll}")
+        fp32_write_layer_key(sd, config.num_hidden_layers, "model.layers.{}.mlp.up_proj.weight", ll, file)
+        keys_len += config.num_hidden_layers
+        
+        ll = config.num_hidden_layers * config.intermediate_size * config.hidden_size
+        # print(f"ll={ll}")
+        fp32_write_layer_key(sd, config.num_hidden_layers, "model.layers.{}.mlp.down_proj.weight", ll, file)
+        keys_len += config.num_hidden_layers
+
+        ll = config.num_hidden_layers * config.hidden_size
+        # print(f"ll={ll}")
+        fp32_write_layer_key(sd, config.num_hidden_layers, "model.layers.{}.input_layernorm.weight", ll, file)
+        keys_len += config.num_hidden_layers
+
+        ll = config.num_hidden_layers * config.hidden_size
+        # print(f"ll={ll}")
+        fp32_write_layer_key(sd, config.num_hidden_layers, "model.layers.{}.post_attention_layernorm.weight", ll, file)
+        keys_len += config.num_hidden_layers
+
+        ll = config.hidden_size
+        fp32_write_single_key(sd, "model.norm.weight", ll, file)
+        keys_len += 1
+
+        ll = config.vocab_size * config.hidden_size
+        fp32_write_single_key(sd, "lm_head.weight", ll, file)
+        keys_len += 1
+
+        print(f"keys length: {keys_len}")
+        assert keys_len == len(model.state_dict())
 
 
 def fp16_write_model(model, filename):
@@ -598,6 +713,8 @@ def q40_write_model(model, filename):
 
 if __name__ == "__main__":
     '''
+    python export.py --filepath="qwen1.5-0.5B-fp32.bin" --dtype="fp32" --model_type=Qwen/Qwen1.5-0.5B-Chat
+
     python export.py --filepath="qwen1.5-0.5B.bin" --dtype="fp16" --model_type=Qwen/Qwen1.5-0.5B-Chat
     python export.py --filepath="qwen1.5-1.8B.bin" --dtype="fp16" --model_type=Qwen/Qwen1.5-1.8B-Chat
     python export.py --filepath="qwen1.5-4B.bin" --dtype="fp16" --model_type=Qwen/Qwen1.5-4B-Chat
@@ -642,6 +759,9 @@ if __name__ == "__main__":
     dtype = args.dtype
     filepath = args.filepath
     print(f"dtype:{dtype} filepath:{filepath}")
+    if (dtype == "fp32"):
+        fp32_write_model(model, filepath)
+    
     if (dtype == "fp16"):
         fp16_write_model(model, filepath)
     if (dtype == "q80"):
