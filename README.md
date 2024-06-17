@@ -72,3 +72,8 @@ Model Parallelism](https://arxiv.org/pdf/1909.08053)
 
 ## continuous batching
 [How continuous batching enables 23x throughput in LLM inference while reducing p50 latency](https://www.anyscale.com/blog/continuous-batching-llm-inference)
+
+## flash-attention
+[From Online Softmax to FlashAttention](https://courses.cs.washington.edu/courses/cse599m/23sp/notes/flashattn.pdf)
+
+[Flash-Decoding for long-context inference](https://crfm.stanford.edu/2023/10/12/flashdecoding.html)
