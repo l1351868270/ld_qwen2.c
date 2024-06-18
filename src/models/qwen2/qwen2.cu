@@ -322,7 +322,6 @@ void qwen2_build_from_checkpoint(Qwen2 *model, const char* checkpoint_path) {
         }
     }
 
-
     // // https://people.csail.mit.edu/xchen/gpu-programming/Lecture14-stream.pdf
     // char *host_memory;
     // cudaHostAlloc((void **)&host_memory, model_size, cudaHostAllocDefault);

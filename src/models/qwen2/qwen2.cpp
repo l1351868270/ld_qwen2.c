@@ -1,6 +1,6 @@
 /*
-make qwen2
-python run.py --model_type=Qwen/Qwen1.5-0.5B-Chat --prompt="天空为什么是蓝色的,答案大于1000字"
+make qwen2_cpp
+python run.py --model_type=Qwen/Qwen1.5-0.5B-Chat -q=fp32 --batch=1 --prompt="天空为什么是蓝色的,答案大于1000字"
 */
 
 #include <time.h>
@@ -10,11 +10,8 @@ python run.py --model_type=Qwen/Qwen1.5-0.5B-Chat --prompt="天空为什么是�
 #include <math.h>
 #include <fcntl.h>
 #include <stdint.h>
-// #include <cuda_fp16.h>
 #include <unistd.h>
 #include <sys/mman.h>
-// #include <cublas_v2.h>
-// #include <cublasLt.h>
 #include "./src/kernels/cpu/embedding.h"
 #include "./src/kernels/cpu/rmsnorm.h"
 #include "./src/kernels/cpu/linear.h"

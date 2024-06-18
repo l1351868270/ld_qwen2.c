@@ -8,7 +8,7 @@ namespace cpu {
 namespace silu {
 
 // https://pytorch.org/docs/stable/generated/torch.nn.SiLU.html
-void silu_fwd(float *hb, float* hb2, int batch, int dim) {
+void siluV1_fwd(float *hb, float* hb2, int batch, int dim) {
     int elem_per_cpu = dim / NUM_CPUS;
     int b;
     #pragma omp parallel for private(b)
@@ -37,6 +37,38 @@ void silu_fwd(float *hb, float* hb2, int batch, int dim) {
     }
 # endif // SILU_DEBUG
 
+}
+
+void siluV2_fwd(float *hb, float* hb2, int batch, int dim) {
+    int b;
+    #pragma omp parallel for private(b)
+    for (int b = 0; b < batch; b++) {
+        int d;
+        #pragma omp parallel for private(d)
+        for (d = 0; d < dim; d++) {
+            int offset = b * dim + d;
+            float val = hb[offset];
+            val *= 1.0f / (1.0f + expf(-val));
+            val *= hb2[offset];
+            hb[offset] = val;
+        }
+    }
+
+#ifdef SILU_DEBUG
+    printf("silu:\n");
+    for (int b = 0; b < batch; b++) {
+        printf("[");
+        for (int i = 0; i < dim; i++) {
+            printf("%f, ", hb[b * dim + i]);
+        }
+        printf("]\n");
+    }
+# endif // SILU_DEBUG
+
+}
+
+void silu_fwd(float *hb, float* hb2, int batch, int dim) {
+    siluV2_fwd(hb, hb2, batch, dim);
 }
 
 } // namespace silu
