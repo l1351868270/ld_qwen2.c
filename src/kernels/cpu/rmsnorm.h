@@ -8,6 +8,10 @@
 #include <immintrin.h>
 #endif
 
+#ifdef NEON_FWD
+#include <arm_neon.h>
+#endif
+
 namespace ld_infer {
 namespace cpu {
 namespace rmsnorm {
@@ -134,9 +138,57 @@ void rmsnorm_avx512_fwd(float* o, float* x, float *weight, float rms_norm_eps, i
 }
 #endif
 
+#ifdef NEON_FWD
+void rmsnorm_neon_fwd(float* o, float* x, float *weight, float rms_norm_eps, int batch, int dim) {
+    // int b;
+    // #pragma omp parallel for private(b)
+    for (int b = 0; b < batch; b++) {
+            
+        int offset = b * dim;
+        float ss = 0.0f;
+        float32x4_t a_neon;
+        float32x4_t d_neon;
+        float32x2_t sum_neon;
+        for (int d = 0; d < dim; d += 4) {
+            a_neon = vld1q_f32(x + offset + d);  
+            d_neon = vmulq_f32(a_neon, a_neon);
+            sum_neon = vadd_f32(vget_low_f32(d_neon), vget_high_f32(d_neon)); 
+            sum_neon = vpadd_f32(sum_neon, sum_neon); 
+            ss += vget_lane_f32(sum_neon, 0);
+        }
+        ss /= dim;
+        ss += rms_norm_eps;
+        ss = 1.0f / sqrtf(ss);
+        
+        int d;
+        #pragma omp parallel for private(d)
+        for (d = 0; d < dim; d += 4) {
+            int offset_o = b * dim + d;
+            int offset_w = d;
+            vst1q_f32(o + offset_o, ss * vmulq_f32(vld1q_f32(x + offset_o), vld1q_f32(weight + offset_w)));
+        }
+    }
+
+#ifdef RMSNORM_DEBUG
+    printf("rmsnorm:\n");
+    for (int b = 0; b < batch; b++) {
+        int offset = b * dim;
+        printf("[");
+        for (int d = 0; d < dim; d++) {
+                printf("%f, ", o[offset + d]);
+        }
+        printf("],\n");
+    }
+#endif // RMSNORM_DEBUG
+
+}
+#endif
+
 void rmsnorm_fwd(float* o, float* x, float *weight, float rms_norm_eps, int batch, int dim) {
 #ifdef AVX512_FWD
     rmsnorm_avx512_fwd(o, x, weight, rms_norm_eps, batch, dim);
+#elif NEON_FWD
+    rmsnorm_neon_fwd(o, x, weight, rms_norm_eps, batch, dim);
 #elif OPENMP_V1
     rmsnormV1_fwd(o, x, weight, rms_norm_eps, batch, dim);
 #else

@@ -134,9 +134,58 @@ void linear_avx512_fwd(float* output, float* input, float *weight, float* bias, 
 }
 #endif
 
+#ifdef NEON_FWD
+void linear_neon_fwd(float* output, float* input, float *weight, float* bias, int batch, int in_features, int out_features) {
+    // int b;
+    // #pragma omp parallel for private(b)
+    for (int b = 0; b < batch; b++) {
+        int d;
+        #pragma omp parallel for private(d)
+        for (d = 0; d < out_features; d++) {
+                int offset_out = b * out_features + d;
+                int offset_bias = d;
+                float value = 0.0f;
+                float32x4_t a_neon;
+                float32x4_t b_neon;
+                float32x4_t d_neon;
+                float32x2_t sum_neon;
+                for (int in = 0; in < in_features; in += 4) {
+                    int offset_in = b * in_features + in;
+                    int offset_weight = d * in_features + in;
+                    a_neon = vld1q_f32(input + offset_in); 
+                    b_neon = vld1q_f32(weight + offset_weight);    
+                    d_neon = vmulq_f32(a_neon, b_neon); 
+                    sum_neon = vadd_f32(vget_low_f32(d_neon), vget_high_f32(d_neon)); 
+                    sum_neon = vpadd_f32(sum_neon, sum_neon); 
+                    value += vget_lane_f32(sum_neon, 0);
+                }
+                output[offset_out] = value;
+
+                if (bias != NULL) {
+                    output[offset_out] += bias[offset_bias];
+                } 
+            }
+    }
+
+#ifdef LINEAR_DEBUG
+    printf("linear_forward:\n");
+    for (int b = 0; b < batch; b++) {
+        printf("[");
+        for (int i = 0; i < out_features; i++) {
+            printf("%f, ", output[b * out_features + i]);
+        }
+        printf("]\n");
+    }
+#endif
+}
+
+#endif
+
 void linear_fwd(float* output, float* input, float *weight, float* bias, int batch, int in_features, int out_features) {
 #ifdef AVX512_FWD
     linear_avx512_fwd(output, input, weight, bias, batch, in_features, out_features);
+#elif NEON_FWD
+    linear_neon_fwd(output, input, weight, bias, batch, in_features, out_features);
 #elif OPENMP_V1
     linearV1_fwd(output, input, weight, bias, batch, in_features, out_features);
 #else
