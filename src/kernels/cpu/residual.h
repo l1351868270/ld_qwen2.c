@@ -11,13 +11,13 @@ namespace cpu {
 namespace residual {
 
 void residualV1_fwd(float *x, float *xb, int batch, int dim) {
-    int elem_per_cpu = dim / NUM_CPUS;
+    int elem_per_cpu = dim / utils::NUM_CPUS;
     // int b;
     // #pragma omp parallel for private(b)
     for (int b = 0; b < batch; b++) {
         int t;
         #pragma omp parallel for private(t)
-        for (t = 0; t < NUM_CPUS; t++) {
+        for (t = 0; t < utils::NUM_CPUS; t++) {
             for (int i = 0; i < elem_per_cpu; i++) {
                 int offset = b * dim + t * elem_per_cpu + i;
                 x[offset] += xb[offset];

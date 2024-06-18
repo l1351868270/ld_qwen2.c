@@ -13,17 +13,17 @@ namespace rope {
 
 void ropeV1_fwd(float *q, float rope_freq_constant, int batch, int num_heads, int head_dim, int pos) {
 
-    int elem_per_cpu = head_dim / 2 / NUM_CPUS;
-    int b;
-    #pragma omp parallel for private(b)
-    for (b = 0; b < batch; b++) {
+    int elem_per_cpu = head_dim / 2 / utils::NUM_CPUS;
+    // int b;
+    // #pragma omp parallel for private(b)
+    for (int b = 0; b < batch; b++) {
         int h;
         #pragma omp parallel for private(h)
         for (h = 0; h < num_heads; h++) {
             int offset = b * num_heads * head_dim + h * head_dim;
             int t;
             #pragma omp parallel for private(t)
-            for (t = 0; t < NUM_CPUS; t++) {
+            for (t = 0; t < utils::NUM_CPUS; t++) {
                 for (int d = 0; d < elem_per_cpu; d++) {
                     // https://arxiv.org/pdf/2104.09864
                     int hd = t * elem_per_cpu + d;
