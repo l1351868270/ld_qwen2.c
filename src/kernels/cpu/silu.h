@@ -10,8 +10,8 @@ namespace silu {
 // https://pytorch.org/docs/stable/generated/torch.nn.SiLU.html
 void siluV1_fwd(float *hb, float* hb2, int batch, int dim) {
     int elem_per_cpu = dim / NUM_CPUS;
-    int b;
-    #pragma omp parallel for private(b)
+    // int b;
+    // #pragma omp parallel for private(b)
     for (int b = 0; b < batch; b++) {
         int t;
         #pragma omp parallel for private(t)
@@ -40,8 +40,8 @@ void siluV1_fwd(float *hb, float* hb2, int batch, int dim) {
 }
 
 void siluV2_fwd(float *hb, float* hb2, int batch, int dim) {
-    int b;
-    #pragma omp parallel for private(b)
+    // int b;
+    // #pragma omp parallel for private(b)
     for (int b = 0; b < batch; b++) {
         int d;
         #pragma omp parallel for private(d)
@@ -68,7 +68,11 @@ void siluV2_fwd(float *hb, float* hb2, int batch, int dim) {
 }
 
 void silu_fwd(float *hb, float* hb2, int batch, int dim) {
+#ifdef OPENMP_V1
+    siluV1_fwd(hb, hb2, batch, dim);
+#else
     siluV2_fwd(hb, hb2, batch, dim);
+#endif
 }
 
 } // namespace silu

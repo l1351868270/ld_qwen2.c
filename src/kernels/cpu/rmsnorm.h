@@ -55,8 +55,8 @@ void rmsnormV1_fwd(float* o, float* x, float *weight, float rms_norm_eps, int ba
 }
 
 void rmsnormV2_fwd(float* o, float* x, float *weight, float rms_norm_eps, int batch, int dim) {
-    int b;
-    #pragma omp parallel for private(b)
+    // int b;
+    // #pragma omp parallel for private(b)
     for (int b = 0; b < batch; b++) {
             
         int offset = b * dim;
@@ -93,8 +93,8 @@ void rmsnormV2_fwd(float* o, float* x, float *weight, float rms_norm_eps, int ba
 
 #ifdef AVX512_FWD
 void rmsnorm_avx512_fwd(float* o, float* x, float *weight, float rms_norm_eps, int batch, int dim) {
-    int b;
-    #pragma omp parallel for private(b)
+    // int b;
+    // #pragma omp parallel for private(b)
     for (int b = 0; b < batch; b++) {
             
         int offset = b * dim;
@@ -137,6 +137,8 @@ void rmsnorm_avx512_fwd(float* o, float* x, float *weight, float rms_norm_eps, i
 void rmsnorm_fwd(float* o, float* x, float *weight, float rms_norm_eps, int batch, int dim) {
 #ifdef AVX512_FWD
     rmsnorm_avx512_fwd(o, x, weight, rms_norm_eps, batch, dim);
+#elif OPENMP_V1
+    rmsnormV1_fwd(o, x, weight, rms_norm_eps, batch, dim);
 #else
     rmsnormV2_fwd(o, x, weight, rms_norm_eps, batch, dim);
 #endif

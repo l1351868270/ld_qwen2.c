@@ -60,9 +60,9 @@ void ropeV1_fwd(float *q, float rope_freq_constant, int batch, int num_heads, in
 }
 
 void ropeV2_fwd(float *q, float rope_freq_constant, int batch, int num_heads, int head_dim, int pos) {
-    int b;
-    #pragma omp parallel for private(b)
-    for (b = 0; b < batch; b++) {
+    // int b;
+    // #pragma omp parallel for private(b)
+    for (int b = 0; b < batch; b++) {
         int h;
         #pragma omp parallel for private(h)
         for (h = 0; h < num_heads; h++) {
@@ -103,7 +103,11 @@ void ropeV2_fwd(float *q, float rope_freq_constant, int batch, int num_heads, in
 }
 
 void rope_fwd(float *q, float rope_freq_constant, int batch, int num_heads, int head_dim, int pos) {
+#ifdef OPENMP_V1
+    ropeV1_fwd(q, rope_freq_constant, batch, num_heads, head_dim, pos);
+#else
     ropeV2_fwd(q, rope_freq_constant, batch, num_heads, head_dim, pos);
+#endif
 }
 
 } // namespace rope

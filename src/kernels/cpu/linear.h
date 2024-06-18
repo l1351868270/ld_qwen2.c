@@ -7,6 +7,10 @@
 #include <immintrin.h>
 #endif
 
+#ifdef NEON_FWD
+#include <arm_neon.h>
+#endif
+
 namespace ld_infer {
 namespace cpu {
 namespace linear {
@@ -14,8 +18,8 @@ namespace linear {
 // https://pytorch.org/docs/stable/generated/torch.nn.Linear.html
 void linearV1_fwd(float* output, float* input, float *weight, float* bias, int batch, int in_features, int out_features) {
     int elem_per_cpu = out_features / NUM_CPUS;
-    int b;
-    #pragma omp parallel for private(b)
+    // int b;
+    // #pragma omp parallel for private(b)
     for (int b = 0; b < batch; b++) {
         int t;
         #pragma omp parallel for private(t)
@@ -51,8 +55,8 @@ void linearV1_fwd(float* output, float* input, float *weight, float* bias, int b
 }
 
 void linearV2_fwd(float* output, float* input, float *weight, float* bias, int batch, int in_features, int out_features) {
-    int b;
-    #pragma omp parallel for private(b)
+    // int b;
+    // #pragma omp parallel for private(b)
     for (int b = 0; b < batch; b++) {
         int d;
         #pragma omp parallel for private(d)
@@ -88,8 +92,8 @@ void linearV2_fwd(float* output, float* input, float *weight, float* bias, int b
 
 #ifdef AVX512_FWD
 void linear_avx512_fwd(float* output, float* input, float *weight, float* bias, int batch, int in_features, int out_features) {
-    int b;
-    #pragma omp parallel for private(b)
+    // int b;
+    // #pragma omp parallel for private(b)
     for (int b = 0; b < batch; b++) {
         int d;
         #pragma omp parallel for private(d)
@@ -133,6 +137,8 @@ void linear_avx512_fwd(float* output, float* input, float *weight, float* bias, 
 void linear_fwd(float* output, float* input, float *weight, float* bias, int batch, int in_features, int out_features) {
 #ifdef AVX512_FWD
     linear_avx512_fwd(output, input, weight, bias, batch, in_features, out_features);
+#elif OPENMP_V1
+    linearV1_fwd(output, input, weight, bias, batch, in_features, out_features);
 #else
     linearV2_fwd(output, input, weight, bias, batch, in_features, out_features);
 #endif

@@ -13,9 +13,9 @@ void group_attention_fwd(float* output, float *q, float *key_cache, float *value
                              int num_transformer_layers, int layer_idx, int pos) {
     int num_groups = q_heads / k_heads;
 
-    int b;
-    #pragma omp parallel for private(b)
-    for (b = 0; b < batch; b++) {
+    // int b;
+    // #pragma omp parallel for private(b)
+    for (int b = 0; b < batch; b++) {
         int h;
         #pragma omp parallel for private(h)
         for (h = 0; h < q_heads; h++) {

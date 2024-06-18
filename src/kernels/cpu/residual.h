@@ -12,8 +12,8 @@ namespace residual {
 
 void residualV1_fwd(float *x, float *xb, int batch, int dim) {
     int elem_per_cpu = dim / NUM_CPUS;
-    int b;
-    #pragma omp parallel for private(b)
+    // int b;
+    // #pragma omp parallel for private(b)
     for (int b = 0; b < batch; b++) {
         int t;
         #pragma omp parallel for private(t)
@@ -40,8 +40,8 @@ void residualV1_fwd(float *x, float *xb, int batch, int dim) {
 }
 
 void residualV2_fwd(float *x, float *xb, int batch, int dim) {
-    int b;
-    #pragma omp parallel for private(b)
+    // int b;
+    // #pragma omp parallel for private(b)
     for (int b = 0; b < batch; b++) {
         int d;
         #pragma omp parallel for private(d)
@@ -67,8 +67,8 @@ void residualV2_fwd(float *x, float *xb, int batch, int dim) {
 
 #ifdef AVX512_FWD
 void residual_avx512_fwd(float *x, float *xb, int batch, int dim) {
-    int b;
-    #pragma omp parallel for private(b)
+    // int b;
+    // #pragma omp parallel for private(b)
     for (int b = 0; b < batch; b++) {
         int d;
         #pragma omp parallel for private(d)
@@ -96,6 +96,8 @@ void residual_avx512_fwd(float *x, float *xb, int batch, int dim) {
 void residual_fwd(float *x, float *xb, int batch, int dim) {
 #ifdef AVX512_FWD
     residual_avx512_fwd(x, xb, batch, dim);
+#elif OPENMP_V1
+    residualV1_fwd(x, xb, batch, dim);
 #else
     residualV2_fwd(x, xb, batch, dim);
 #endif
