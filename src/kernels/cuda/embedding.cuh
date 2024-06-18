@@ -4,6 +4,7 @@
 #include <cuda_fp16.h>
 #include "utils.cuh"
 namespace ld_infer {
+namespace cuda {
 namespace embedding {
 
 template <typename T>
@@ -46,4 +47,5 @@ void embedding_fwd_launch(T *x, T* embed_tokens, int *token, int batch, int dim)
 }
 
 } // namespace embedding
+} // namespace cuda
 } // namespace ld_infer

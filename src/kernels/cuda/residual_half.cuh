@@ -4,6 +4,7 @@
 #include "utils.cuh"
 
 namespace ld_infer {
+namespace cuda {
 namespace residual_half {
 
 __global__
@@ -39,4 +40,5 @@ void residual_fwd_launch(half *x, half *xb, int batch, int dim)
 }
 
 } // namespace residual_half
+} // namespace cuda
 } // namespace ld_infer

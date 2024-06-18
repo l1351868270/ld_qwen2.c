@@ -6,6 +6,7 @@
 #include <stdio.h>
 
 namespace ld_infer {
+namespace cuda {
 namespace rope_half {
 __global__ 
 void rope_fwd(half *q, float rope_freq_constant, int num_heads, int head_dim, int pos) {
@@ -51,4 +52,5 @@ void rope_launch(half *q, float rope_theta, int batch, int num_heads, int head_d
 }
 
 } // namespace rope_half
+} // namespace cuda
 } // namespace ld_infer

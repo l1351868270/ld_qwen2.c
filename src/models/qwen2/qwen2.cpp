@@ -164,8 +164,10 @@ void parse_ll(char** ptr, unsigned long long *ll, unsigned long long *ll_bytes) 
     (*ptr) += sizeof(unsigned long long);
     *ll_bytes = *(unsigned long long*)(*ptr);
     (*ptr) += sizeof(unsigned long long);
-    printf("++++++++++++--------%llu\n", *ll);
-    printf("++++++++++++--------%llu\n", *ll_bytes);
+#ifdef WEIGHTS_DEBUG
+    printf("weights length is:       %llu\n", *ll);
+    printf("weights bytes length is: %llu\n", *ll_bytes);
+#endif
 }
 
 void memory_map_weights(Qwen2Weights *w, Qwen2Config* p, char* ptr) {
@@ -227,8 +229,9 @@ void qwen2_build_from_checkpoint(Qwen2 *model, const char* checkpoint_path) {
     fseek(model_file, 0, SEEK_END);
     file_size = ftell(model_file);
     fseek(model_file, 0, SEEK_SET);
+#ifdef WEIGHTS_DEBUG
     printf("file_size is: %ld\n", file_size);
-    
+#endif
     int rcount = 0;
     int model_magic;
     rcount = fread(&model_magic, sizeof(int), 1, model_file);
@@ -241,13 +244,15 @@ void qwen2_build_from_checkpoint(Qwen2 *model, const char* checkpoint_path) {
         fprintf(stderr, "Bad magic model file %s\n", checkpoint_path);
         exit(1);
     }
+#ifdef WEIGHTS_DEBUG
     printf("model magic is: %d\n", model_magic);
-
+#endif
     rcount = fread(&model->config, sizeof(int), sizeof(model->config) / sizeof(int), model_file);
     if (rcount != sizeof(model->config) / sizeof(int)) {
         fprintf(stderr, "Bad read config from model file %s\n", checkpoint_path);
         exit(1);
     }
+#ifdef WEIGHTS_DEBUG
     printf("config hidden_size is: %d\n", model->config.hidden_size);
     printf("config intermediate_size is: %d\n", model->config.intermediate_size);
     printf("config max_position_embeddings is: %d\n", model->config.max_position_embeddings);
@@ -259,7 +264,7 @@ void qwen2_build_from_checkpoint(Qwen2 *model, const char* checkpoint_path) {
     printf("config rope_theta is: %f\n", model->config.rope_theta);
     printf("config sliding_window is: %d\n", model->config.sliding_window);
     printf("config vocab_size is: %d\n", model->config.vocab_size);
-
+#endif
     size_t head_bytes = sizeof(model->config) + sizeof(int);
     if (head_bytes % MODEL_LIANMENT != 0) {
         head_bytes += MODEL_LIANMENT - head_bytes % MODEL_LIANMENT;
@@ -285,18 +290,19 @@ void qwen2_build_from_checkpoint(Qwen2 *model, const char* checkpoint_path) {
     size_t n_chuncks = model_size / chunck_size;
     size_t tail_size = model_size % chunck_size;
 
-    printf("loading model from disk to host memory......\n");
+    printf("loading model from disk to host memory chuncks: %ld......\n", n_chuncks);
     for (size_t i = 0; i < n_chuncks; i++) {
         rcount = fread(host_memory + i * chunck_size, sizeof(char), chunck_size, model_file);
         if (rcount != chunck_size) {
             fprintf(stderr, "Bad read model from model file %s\n", checkpoint_path);
             exit(1);
         }
+    #ifdef WEIGHTS_DEBUG
         printf("n_chuncks:%lu the %lu chuncks\n", n_chuncks, i);
+    #endif
     }
 
     if (tail_size > 0) {
-        printf("tail_size:%lu \n", tail_size);
         rcount = fread(host_memory + n_chuncks * chunck_size, sizeof(char), tail_size, model_file);
         if (rcount != tail_size) {
             fprintf(stderr, "Bad read model from model file %s\n", checkpoint_path);
@@ -305,8 +311,6 @@ void qwen2_build_from_checkpoint(Qwen2 *model, const char* checkpoint_path) {
     }
 
     memory_map_weights(&model->weights, &model->config, (char*)host_memory);
-    
-    // free(host_memory);
 }
 
 typedef struct {

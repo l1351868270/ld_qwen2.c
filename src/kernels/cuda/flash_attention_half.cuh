@@ -5,8 +5,9 @@
 #include "utils.cuh"
 
 namespace ld_infer {
+namespace cuda {
 namespace flash_attention_half {
-    
+
 // https://courses.cs.washington.edu/courses/cse599m/23sp/notes/flashattn.pdf
 __global__
 void group_flash_attention_half_fwd(half* output, half *half_q, half *key_cache, half *value_cache,
@@ -149,4 +150,5 @@ void flash_attention_half_fwd_launch(half* output, half *q, half *key_cache, hal
 }
 
 } // namespace flash_attention_half
+} // namespace cuda
 } // namespace ld_infer

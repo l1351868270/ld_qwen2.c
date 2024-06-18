@@ -1,7 +1,7 @@
 CC = nvcc
 
 qwen2: src/models/qwen2/qwen2.cu
-	$(CC) --shared -DLINEAR_DEBU -DARGMAX_DEBU -Xcompiler -fPIC --std=c++20 -o qwen2_fp16.so -O3 src/models/qwen2/qwen2.cu -I./ -lm -lcublas -lcublasLt  -gencode arch=compute_80,code=sm_80 
+	$(CC) --shared -DWEIGHTS_DEBU -DARGMAX_DEBU -Xcompiler -fPIC --std=c++20 -o qwen2_fp16.so -O3 src/models/qwen2/qwen2.cu -I./ -lm -lcublas -lcublasLt  -gencode arch=compute_80,code=sm_80 
 
 qwen2_cpp: src/models/qwen2/qwen2.cpp
 	g++ --shared -DLINEAR_DEBU -D ARGMAX_DEBU -fPIC --std=c++20 -o qwen2_fp32.so -O4 src/models/qwen2/qwen2.cpp -I./ -lm -fopenmp

@@ -7,6 +7,7 @@
 #include "./src/kernels/cuda/add_half.cuh"
 
 namespace ld_infer {
+namespace cuda {
 namespace linear_half {
 
 // https://pytorch.org/docs/stable/generated/torch.nn.Linear.html
@@ -37,7 +38,7 @@ void linear_fwd_launch(cublasHandle_t* handle, half* output, half* input, half *
                                           output, CUDA_R_16F, N);
 
     if (bias != NULL) {
-        ld_infer::add_half::add_fwd_launch(output, bias, batch, out_features);
+        ld_infer::cuda::add_half::add_fwd_launch(output, bias, batch, out_features);
     }
 
 #ifdef LINEAR_DEBUG
@@ -92,7 +93,7 @@ void linear_fwd_launch1(cublasHandle_t* handle, half* output, half* input, half 
                                           output, CUDA_R_16F, N);
 
     if (bias != NULL) {
-        ld_infer::add_half::add_fwd_launch(output, bias, batch, out_features);
+        ld_infer::cuda::add_half::add_fwd_launch(output, bias, batch, out_features);
     }
 
 #ifdef LINEAR_DEBUG1
@@ -121,4 +122,5 @@ void linear_fwd_launch1(cublasHandle_t* handle, half* output, half* input, half 
 }
 
 } // namespace linear_half
+} // namespace cuda
 } // namespace ld_infer

@@ -4,6 +4,7 @@
 #include "utils.cuh"
 
 namespace ld_infer {
+namespace cuda {
 namespace silu_half {
 
 // https://pytorch.org/docs/stable/generated/torch.nn.SiLU.html
@@ -42,4 +43,5 @@ void silu_fwd_launch(half *hb, half* hb2, int batch, int dim){
 }
 
 } // namespace silu_half
+} // namespace cuda
 } // namespace ld_infer

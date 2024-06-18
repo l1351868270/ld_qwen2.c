@@ -5,6 +5,7 @@
 #include "utils.cuh"
 
 namespace ld_infer {
+namespace cuda {
 namespace rmsnorm_half {
 
 // https://arxiv.org/pdf/1910.07467
@@ -57,4 +58,5 @@ void rmsnorm_fwd_launch(half* o, half* x, half *weight, float rms_norm_eps, int 
         rmsnorm_fwd<<<dim3(batch, dim / WARPGROUP_THREADS), WARPGROUP_THREADS>>>(o, x, weight, rms_norm_eps, dim);
 }
 } // namespace rmsnorm_half
+} // namespace cuda
 } // namespace ld_infer

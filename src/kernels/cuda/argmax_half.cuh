@@ -5,6 +5,7 @@
 #include "utils.cuh"
 
 namespace ld_infer {
+namespace cuda {
 namespace argmax_half {
 
 __global__
@@ -57,4 +58,5 @@ void argmax_fwd_launch(int* output, half* input, int batch, int dim) {
 }
 
 } // namespace argmax_half
+} // namespace cuda
 } // namespace ld_infer

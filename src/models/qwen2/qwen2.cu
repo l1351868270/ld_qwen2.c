@@ -165,13 +165,15 @@ void free_run_state(RunState* s) {
     free(s->next_cpu);
 }
 
-void parse_ll(char** ptr, unsigned long long *ll, unsigned long long *ll_bytes) {
+void parse_ll(char** ptr, unsigned long long *ll, unsigned long long *ll_bytes, char *weight_name = nullptr) {
     cudaMemcpy(ll, *ptr, sizeof(unsigned long long), cudaMemcpyDeviceToHost);
     *ptr += sizeof(unsigned long long);
     cudaMemcpy(ll_bytes, *ptr, sizeof(unsigned long long), cudaMemcpyDeviceToHost);
     *ptr += sizeof(unsigned long long);
-    printf("++++++++++++--------%llu\n", *ll);
-    printf("++++++++++++--------%llu\n", *ll_bytes);
+#ifdef WEIGHTS_DEBUG
+    printf("weights length is:       %llu\n", *ll);
+    printf("weights bytes length is: %llu\n", *ll_bytes);
+#endif
 }
 
 void memory_map_weights(Qwen2Weights *w, Qwen2Config* p, char* ptr) {
@@ -233,8 +235,11 @@ void qwen2_build_from_checkpoint(Qwen2 *model, const char* checkpoint_path) {
     fseek(model_file, 0, SEEK_END);
     file_size = ftell(model_file);
     fseek(model_file, 0, SEEK_SET);
+
+#ifdef WEIGHTS_DEBUG
     printf("file_size is: %ld\n", file_size);
-    
+#endif
+
     int rcount = 0;
     int model_magic;
     rcount = fread(&model_magic, sizeof(int), 1, model_file);
@@ -247,13 +252,17 @@ void qwen2_build_from_checkpoint(Qwen2 *model, const char* checkpoint_path) {
         fprintf(stderr, "Bad magic model file %s\n", checkpoint_path);
         exit(1);
     }
-    printf("model magic is: %d\n", model_magic);
 
+#ifdef WEIGHTS_DEBUG
+    printf("model magic is: %d\n", model_magic);
+#endif
     rcount = fread(&model->config, sizeof(int), sizeof(model->config) / sizeof(int), model_file);
     if (rcount != sizeof(model->config) / sizeof(int)) {
         fprintf(stderr, "Bad read config from model file %s\n", checkpoint_path);
         exit(1);
     }
+
+#ifdef WEIGHTS_DEBUG
     printf("config hidden_size is: %d\n", model->config.hidden_size);
     printf("config intermediate_size is: %d\n", model->config.intermediate_size);
     printf("config max_position_embeddings is: %d\n", model->config.max_position_embeddings);
@@ -265,6 +274,7 @@ void qwen2_build_from_checkpoint(Qwen2 *model, const char* checkpoint_path) {
     printf("config rope_theta is: %f\n", model->config.rope_theta);
     printf("config sliding_window is: %d\n", model->config.sliding_window);
     printf("config vocab_size is: %d\n", model->config.vocab_size);
+#endif
 
     size_t head_bytes = sizeof(model->config) + sizeof(int);
     if (head_bytes % MODEL_LIANMENT != 0) {
@@ -272,6 +282,7 @@ void qwen2_build_from_checkpoint(Qwen2 *model, const char* checkpoint_path) {
         rcount = fread(model_alignment, sizeof(char), MODEL_LIANMENT - head_bytes % MODEL_LIANMENT, model_file);
     }
     size_t model_size = file_size - head_bytes;
+
     printf("model_size: %ld bytes, via %f KB, via %f MB, via %f GB\n", 
             model_size, (float)model_size / 1024, (float)model_size / 1024 / 1024, (float)model_size / 1024 / 1024 / 1024);
 
@@ -291,18 +302,19 @@ void qwen2_build_from_checkpoint(Qwen2 *model, const char* checkpoint_path) {
     size_t n_chuncks = model_size / chunck_size;
     size_t tail_size = model_size % chunck_size;
 
-    printf("loading model from disk to host memory......\n");
+    printf("loading model from disk to host memory chuncks: %ld ......\n", n_chuncks);
     for (size_t i = 0; i < n_chuncks; i++) {
         rcount = fread(host_memory + i * chunck_size, sizeof(char), chunck_size, model_file);
         if (rcount != chunck_size) {
             fprintf(stderr, "Bad read model from model file %s\n", checkpoint_path);
             exit(1);
         }
+    #ifdef WEIGHTS_DEBUG
         printf("n_chuncks:%lu the %lu chuncks\n", n_chuncks, i);
+    #endif
     }
 
     if (tail_size > 0) {
-        printf("tail_size:%lu \n", tail_size);
         rcount = fread(host_memory + n_chuncks * chunck_size, sizeof(char), tail_size, model_file);
         if (rcount != tail_size) {
             fprintf(stderr, "Bad read model from model file %s\n", checkpoint_path);
@@ -324,11 +336,7 @@ void qwen2_build_from_checkpoint(Qwen2 *model, const char* checkpoint_path) {
     cudaError_t err;
     printf("loading model from host memory to device memory......\n");
     cudaMalloc((void**)&device_memory, model_size);
-    err = cudaGetLastError();
-    if (err != cudaSuccess) {
-        fprintf(stderr, "cudaMalloc failed %ld %s\n", model_size, cudaGetErrorName(err));
-    }
-
+    ld_infer::cuda::CudaCheckError();
     cudaEvent_t start, stop;
     cudaEventCreate(&start);
     cudaEventCreate(&stop);
@@ -384,20 +392,13 @@ void* qwen2_forward(Context *ctx, cublasHandle_t *handle, Qwen2* qwen2, int *tok
     int num_heads = num_attention_heads;
     int head_dim = hidden_size / num_heads;
     
-    // printf("qwen2_forward pos:%d, batch:%d, hidden_size:%d \n", pos, batch, hidden_size);
-    cudaError_t err;
-    ld_infer::embedding::embedding_fwd_launch<half>(s->half_x, w->embed_tokens, token, batch, hidden_size);
+    ld_infer::cuda::embedding::embedding_fwd_launch<half>(s->half_x, w->embed_tokens, token, batch, hidden_size);
+    ld_infer::cuda::CudaCheckError();
 
-    err = cudaGetLastError();
-    if (err != cudaSuccess) {
-        printf("%s\n", cudaGetErrorName(err));
-    }
-
-    cudaDeviceSynchronize();
     // for(int l = 0; l < 1; l++) {
     for(int l = 0; l < p->num_hidden_layers; l++) {
         // attn_norm
-        ld_infer::rmsnorm_half::rmsnorm_fwd_launch(s->half_xb, s->half_x, w->input_layernorm + l*hidden_size, rms_norm_eps, batch, hidden_size);
+        ld_infer::cuda::rmsnorm_half::rmsnorm_fwd_launch(s->half_xb, s->half_x, w->input_layernorm + l*hidden_size, rms_norm_eps, batch, hidden_size);
 
         int offset_k = l * max_seq_len * batch * num_key_value_heads * head_dim 
                          + pos * batch * num_key_value_heads * head_dim;
@@ -407,41 +408,39 @@ void* qwen2_forward(Context *ctx, cublasHandle_t *handle, Qwen2* qwen2, int *tok
         s->half_k = s->half_key_cache + offset_k;
         s->half_v = s->half_value_cache + offset_v;
 
-        // batch * p->num_hidden_layers * seq_len * num_heads * head_dim
+        ld_infer::cuda::linear_half::linear_fwd_launch(s->handle, s->half_q, s->half_xb, w->q_proj_w + l * hidden_size * (num_heads * head_dim), w->q_proj_b + l * (num_heads * head_dim), batch, hidden_size, num_heads * head_dim);        
+        ld_infer::cuda::linear_half::linear_fwd_launch(s->handle, s->half_k, s->half_xb, w->k_proj_w + l * hidden_size * (num_key_value_heads * head_dim), w->k_proj_b + l * (num_key_value_heads * head_dim), batch, hidden_size, num_key_value_heads * head_dim);
+        ld_infer::cuda::linear_half::linear_fwd_launch(s->handle, s->half_v, s->half_xb, w->v_proj_w + l * hidden_size * (num_key_value_heads * head_dim), w->v_proj_b + l * (num_key_value_heads * head_dim), batch, hidden_size, num_key_value_heads * head_dim);
 
-        ld_infer::linear_half::linear_fwd_launch(s->handle, s->half_q, s->half_xb, w->q_proj_w + l * hidden_size * (num_heads * head_dim), w->q_proj_b + l * (num_heads * head_dim), batch, hidden_size, num_heads * head_dim);        
-        ld_infer::linear_half::linear_fwd_launch(s->handle, s->half_k, s->half_xb, w->k_proj_w + l * hidden_size * (num_key_value_heads * head_dim), w->k_proj_b + l * (num_key_value_heads * head_dim), batch, hidden_size, num_key_value_heads * head_dim);
-        ld_infer::linear_half::linear_fwd_launch(s->handle, s->half_v, s->half_xb, w->v_proj_w + l * hidden_size * (num_key_value_heads * head_dim), w->v_proj_b + l * (num_key_value_heads * head_dim), batch, hidden_size, num_key_value_heads * head_dim);
+        ld_infer::cuda::rope_half::rope_launch(s->half_q, rope_theta, batch, num_heads, head_dim, pos);
+        ld_infer::cuda::rope_half::rope_launch(s->half_k, rope_theta, batch, num_key_value_heads, head_dim, pos);
 
-        ld_infer::rope_half::rope_launch(s->half_q, rope_theta, batch, num_heads, head_dim, pos);
-        ld_infer::rope_half::rope_launch(s->half_k, rope_theta, batch, num_key_value_heads, head_dim, pos);
-
-        ld_infer::flash_attention_half::flash_attention_half_fwd_launch(s->half_xb, s->half_q, s->half_key_cache, s->half_value_cache, 
+        ld_infer::cuda::flash_attention_half::flash_attention_half_fwd_launch(s->half_xb, s->half_q, s->half_key_cache, s->half_value_cache, 
                              batch, num_heads, num_key_value_heads, head_dim, num_heads, num_key_value_heads, max_seq_len, 
                              num_hidden_layers, l, pos);
 
 
 
-        ld_infer::linear_half::linear_fwd_launch(s->handle, s->half_xb2, s->half_xb, w->o_proj + l * (num_heads * head_dim) * hidden_size, NULL, batch, num_heads * head_dim, hidden_size);
+        ld_infer::cuda::linear_half::linear_fwd_launch(s->handle, s->half_xb2, s->half_xb, w->o_proj + l * (num_heads * head_dim) * hidden_size, NULL, batch, num_heads * head_dim, hidden_size);
 
-        ld_infer::residual_half::residual_fwd_launch(s->half_x, s->half_xb2, batch, hidden_size);
+        ld_infer::cuda::residual_half::residual_fwd_launch(s->half_x, s->half_xb2, batch, hidden_size);
 
         // ffn_norm
-        ld_infer::rmsnorm_half::rmsnorm_fwd_launch(s->half_xb, s->half_x, w->post_attention_layernorm + l*hidden_size, rms_norm_eps, batch, hidden_size);
-        ld_infer::linear_half::linear_fwd_launch(s->handle, s->half_hb, s->half_xb, w->gate_proj + l*intermediate_size*hidden_size, NULL, batch, hidden_size, intermediate_size);
-        ld_infer::linear_half::linear_fwd_launch(s->handle, s->half_hb2, s->half_xb, w->up_proj + l*intermediate_size*hidden_size, NULL, batch, hidden_size, intermediate_size);
+        ld_infer::cuda::rmsnorm_half::rmsnorm_fwd_launch(s->half_xb, s->half_x, w->post_attention_layernorm + l*hidden_size, rms_norm_eps, batch, hidden_size);
+        ld_infer::cuda::linear_half::linear_fwd_launch(s->handle, s->half_hb, s->half_xb, w->gate_proj + l*intermediate_size*hidden_size, NULL, batch, hidden_size, intermediate_size);
+        ld_infer::cuda::linear_half::linear_fwd_launch(s->handle, s->half_hb2, s->half_xb, w->up_proj + l*intermediate_size*hidden_size, NULL, batch, hidden_size, intermediate_size);
 
-        ld_infer::silu_half::silu_fwd_launch(s->half_hb, s->half_hb2, batch, intermediate_size);
+        ld_infer::cuda::silu_half::silu_fwd_launch(s->half_hb, s->half_hb2, batch, intermediate_size);
 
-        ld_infer::linear_half::linear_fwd_launch(s->handle, s->half_xb, s->half_hb, w->down_proj + l* hidden_size * intermediate_size, NULL, batch, intermediate_size, hidden_size);
+        ld_infer::cuda::linear_half::linear_fwd_launch(s->handle, s->half_xb, s->half_hb, w->down_proj + l* hidden_size * intermediate_size, NULL, batch, intermediate_size, hidden_size);
                 
-        ld_infer::residual_half::residual_fwd_launch(s->half_x, s->half_xb, batch, hidden_size);
+        ld_infer::cuda::residual_half::residual_fwd_launch(s->half_x, s->half_xb, batch, hidden_size);
 
         // cudaDeviceSynchronize();
     }
     
-    ld_infer::rmsnorm_half::rmsnorm_fwd_launch(s->half_x, s->half_x, w->norm, rms_norm_eps, batch, hidden_size);
-    ld_infer::linear_half::linear_fwd_launch1(s->handle, s->half_logits, s->half_x, w->lm_head, NULL, batch, hidden_size, vocab_size);
+    ld_infer::cuda::rmsnorm_half::rmsnorm_fwd_launch(s->half_x, s->half_x, w->norm, rms_norm_eps, batch, hidden_size);
+    ld_infer::cuda::linear_half::linear_fwd_launch1(s->handle, s->half_logits, s->half_x, w->lm_head, NULL, batch, hidden_size, vocab_size);
 
     return s->half_logits;
 }
@@ -481,12 +480,12 @@ int* c_qwen2_forward(int batch, int seq_len, int *data, int pos) {
     Context ctx;
     qwen2_forward(&ctx, s->handle, &py_model, s->token, batch, pos);
     // cudaDeviceSynchronize();
-    ld_infer::argmax_half::argmax_fwd_launch(s->next, s->half_logits, s->batch, py_model.config.vocab_size);
+    ld_infer::cuda::argmax_half::argmax_fwd_launch(s->next, s->half_logits, s->batch, py_model.config.vocab_size);
 
-        // if (pos == 10) {
-        //     cudaDeviceSynchronize();
-        //     exit(1);
-        // }
+    // if (pos == 10) {
+    //     cudaDeviceSynchronize();
+    //     exit(1);
+    // }
 
     for (int i = 0; i < s->batch; i++) {
         cudaMemcpy(s->next_cpu + i, s->next + i, sizeof(int), cudaMemcpyDeviceToHost);
