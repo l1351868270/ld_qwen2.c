@@ -1,6 +1,8 @@
 # ld_qwen2.c
 
 # 已完成
+## CPU
+支持x86 avx512, aarch64 neon
 ## kv cache
 ## 混合精度 
 
