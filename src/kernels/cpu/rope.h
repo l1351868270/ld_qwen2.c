@@ -3,6 +3,10 @@
 #include <math.h>
 #include "utils.h"
 
+#ifdef AVX512_FWD
+#include <immintrin.h>
+#endif
+
 namespace ld_infer {
 namespace cpu {
 namespace rope {

@@ -2,6 +2,10 @@
 
 #include "utils.h"
 
+#ifdef AVX512_FWD
+#include <immintrin.h>
+#endif
+
 namespace ld_infer {
 namespace cpu {
 namespace residual {
@@ -61,8 +65,40 @@ void residualV2_fwd(float *x, float *xb, int batch, int dim) {
 
 }
 
+#ifdef AVX512_FWD
+void residual_avx512_fwd(float *x, float *xb, int batch, int dim) {
+    int b;
+    #pragma omp parallel for private(b)
+    for (int b = 0; b < batch; b++) {
+        int d;
+        #pragma omp parallel for private(d)
+        for (d = 0; d < dim; d += 16) {
+            int offset = b * dim + d;
+            _mm512_storeu_ps(x + offset, _mm512_add_ps(_mm512_loadu_ps(x + offset), _mm512_loadu_ps(xb + offset)));
+        }
+    }
+
+#ifdef RESIDUAL_DEBUG
+    printf("residual:\n");
+    for (int b = 0; b < batch; b++) {
+        printf("[");
+        for (int i = 0; i < dim; i++) {
+            int offset_x = b * dim + i;
+            printf("%f, ", x[offset_x]);
+        }
+        printf("]\n");
+    }
+#endif // RESIDUAL_DEBUG
+
+}
+#endif
+
 void residual_fwd(float *x, float *xb, int batch, int dim) {
+#ifdef AVX512_FWD
+    residual_avx512_fwd(x, xb, batch, dim);
+#else
     residualV2_fwd(x, xb, batch, dim);
+#endif
 }
 
 } // namespace residual
