@@ -9,6 +9,23 @@ tools: 工具文件，包括模型export, python run wrapper, demo等
 
 scripts: 脚本文件
 
+## 安装
+git clone https://github.com/l1351868270/ld_qwen2.c.git
+
+cd ld_qwen2.c
+
+python tools/export.py --filepath="qwen1.5-0.5B-fp16.bin" --dtype="fp16" --model_type=Qwen/Qwen1.5-0.5B-Chat
+
+make clean
+
+make single_W16A16
+
+python tools/run.py -p "天空为什么是蓝色的" -m "Qwen/Qwen1.5-0.5B-Chat" -q fp16 --batch 1
+
+或者
+
+./scripts/run_qwen2_0.5B.sh
+
 # 已完成
 ## CPU
 x86 avx512, 
