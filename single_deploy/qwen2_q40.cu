@@ -13,7 +13,7 @@ python run.py --model_type=Qwen/Qwen1.5-1.8B-Chat --prompt="天空为什么是�
 #include <cuda_fp16.h>
 #include <unistd.h>
 #include <sys/mman.h>
-#include "./dev/cuda/gemv_fwd/gemv_fast_fwd.cu"
+#include "../dev/cuda/gemv_fwd/gemv_fast_fwd.cu"
 #include <cublas_v2.h>
 #include <cublasLt.h>
 
@@ -44,22 +44,22 @@ typedef struct {
 
 typedef struct {
     half *embed_tokens;    // model.embed_tokens.weight
-    int8_t *q_proj_w;        // model.layers.{i}.self_attn.q_proj.weight
+    uint8_t *q_proj_w;        // model.layers.{i}.self_attn.q_proj.weight
     half *q_proj_w_s;
     half *q_proj_b;        // model.layers.{i}.self_attn.q_proj.bias
-    int8_t *k_proj_w;        // model.layers.{i}.self_attn.k_proj.weight
+    uint8_t *k_proj_w;        // model.layers.{i}.self_attn.k_proj.weight
     half *k_proj_w_s;
     half *k_proj_b;        // model.layers.{i}.self_attn.k_proj.bias
-    int8_t *v_proj_w;        // model.layers.{i}.self_attn.v_proj.weight
+    uint8_t *v_proj_w;        // model.layers.{i}.self_attn.v_proj.weight
     half *v_proj_w_s;
     half *v_proj_b;        // model.layers.{i}.self_attn.v_proj.bias
-    int8_t *o_proj;          // model.layers.{i}.self_attn.o_proj.weight
+    uint8_t *o_proj;          // model.layers.{i}.self_attn.o_proj.weight
     half *o_proj_s; 
-    int8_t *gate_proj;       // model.layers.{i}.mlp.gate_proj.weight
+    uint8_t *gate_proj;       // model.layers.{i}.mlp.gate_proj.weight
     half *gate_proj_s; 
-    int8_t *up_proj;                    // model.layers.{i}.mlp.up_proj.weight
+    uint8_t *up_proj;                    // model.layers.{i}.mlp.up_proj.weight
     half *up_proj_s;
-    int8_t *down_proj;                  // model.layers.{i}.mlp.down_proj.weight
+    uint8_t *down_proj;                  // model.layers.{i}.mlp.down_proj.weight
     half *down_proj_s; 
     half *input_layernorm;            // model.layers.{i}.input_layernorm.weight
     half *post_attention_layernorm;   // model.layers.{i}.post_attention_layernorm.weight
@@ -183,7 +183,7 @@ void memory_map_weights(Qwen2Weights *w, Qwen2Config* p, char* ptr) {
     ptr += sizeof(unsigned long long);
     printf("q_proj_w length: %llu\n", ll);
     printf("q_proj_w bytes: %llu\n", ll_bytes);
-    w->q_proj_w = (int8_t*)ptr;
+    w->q_proj_w = (uint8_t*)ptr;
     ptr += ll_bytes;
     cudaMemcpy(&ll, ptr, sizeof(unsigned long long), cudaMemcpyDeviceToHost);
     ptr += sizeof(unsigned long long);
@@ -207,7 +207,7 @@ void memory_map_weights(Qwen2Weights *w, Qwen2Config* p, char* ptr) {
     ptr += sizeof(unsigned long long);
     printf("k_proj_w length: %llu\n", ll);
     printf("k_proj_w bytes: %llu\n", ll_bytes);
-    w->k_proj_w = (int8_t*)ptr;
+    w->k_proj_w = (uint8_t*)ptr;
     ptr += ll_bytes;
     cudaMemcpy(&ll, ptr, sizeof(unsigned long long), cudaMemcpyDeviceToHost);
     ptr += sizeof(unsigned long long);
@@ -231,7 +231,7 @@ void memory_map_weights(Qwen2Weights *w, Qwen2Config* p, char* ptr) {
     ptr += sizeof(unsigned long long);
     printf("v_proj_w length: %llu\n", ll);
     printf("v_proj_w bytes: %llu\n", ll_bytes);
-    w->v_proj_w = (int8_t*)ptr;
+    w->v_proj_w = (uint8_t*)ptr;
     ptr += ll_bytes;
     cudaMemcpy(&ll, ptr, sizeof(unsigned long long), cudaMemcpyDeviceToHost);
     ptr += sizeof(unsigned long long);
@@ -255,7 +255,7 @@ void memory_map_weights(Qwen2Weights *w, Qwen2Config* p, char* ptr) {
     ptr += sizeof(unsigned long long);
     printf("o_proj length: %llu\n", ll);
     printf("o_proj bytes: %llu\n", ll_bytes);
-    w->o_proj = (int8_t*)ptr;
+    w->o_proj = (uint8_t*)ptr;
     ptr += ll_bytes;
     cudaMemcpy(&ll, ptr, sizeof(unsigned long long), cudaMemcpyDeviceToHost);
     ptr += sizeof(unsigned long long);
@@ -271,7 +271,7 @@ void memory_map_weights(Qwen2Weights *w, Qwen2Config* p, char* ptr) {
     ptr += sizeof(unsigned long long);
     printf("gate_proj length: %llu\n", ll);
     printf("gate_proj bytes: %llu\n", ll_bytes);
-    w->gate_proj = (int8_t*)ptr;
+    w->gate_proj = (uint8_t*)ptr;
     ptr += ll_bytes;
     cudaMemcpy(&ll, ptr, sizeof(unsigned long long), cudaMemcpyDeviceToHost);
     ptr += sizeof(unsigned long long);
@@ -287,7 +287,7 @@ void memory_map_weights(Qwen2Weights *w, Qwen2Config* p, char* ptr) {
     ptr += sizeof(unsigned long long);
     printf("up_proj length: %llu\n", ll);
     printf("up_proj bytes: %llu\n", ll_bytes);
-    w->up_proj = (int8_t*)ptr;
+    w->up_proj = (uint8_t*)ptr;
     ptr += ll_bytes;
     cudaMemcpy(&ll, ptr, sizeof(unsigned long long), cudaMemcpyDeviceToHost);
     ptr += sizeof(unsigned long long);
@@ -303,7 +303,7 @@ void memory_map_weights(Qwen2Weights *w, Qwen2Config* p, char* ptr) {
     ptr += sizeof(unsigned long long);
     printf("down_proj length: %llu\n", ll);
     printf("down_proj bytes: %llu\n", ll_bytes);
-    w->down_proj = (int8_t*)ptr;
+    w->down_proj = (uint8_t*)ptr;
     ptr += ll_bytes;
     cudaMemcpy(&ll, ptr, sizeof(unsigned long long), cudaMemcpyDeviceToHost);
     ptr += sizeof(unsigned long long);
@@ -557,12 +557,12 @@ void add_half_forward(half* output, half* input) {
 }
 
 // https://pytorch.org/docs/stable/generated/torch.nn.Linear.html
-void linear_forward(half* output, half* input, int8_t *weight, half* bias, half* scale, int batch, int in_features, int out_features) {
+void linear_forward(half* output, half* input, uint8_t *weight, half* bias, half* scale, int batch, int in_features, int out_features) {
     int M = batch;
     int N = out_features;
     int K = in_features;
 
-    gemv::gemv_fast_q80_fwd(output, input, weight, scale, M, N, K);
+    gemv::gemv_fast_q40_fwd(output, input, weight, scale, M, N, K);
 
     if (bias != NULL) {
         add_half_forward<<<out_features / WARPGROUP_THREADS, WARPGROUP_THREADS>>>(output, bias);
@@ -893,15 +893,12 @@ void* qwen2_forward(Context *ctx, Qwen2* qwen2, int *token, int batch, int pos) 
     
     // printf("qwen2_forward pos:%d, batch:%d, hidden_size:%d \n", pos, batch, hidden_size);
     cudaError_t err;
-    
-    // get_content_row<<<dim3(batch, hidden_size/WARPGROUP_THREADS), WARPGROUP_THREADS>>>(x, w->embed_tokens, token, batch, hidden_size);
     get_content_row_half<<<dim3(batch, hidden_size/WARPGROUP_THREADS), WARPGROUP_THREADS>>>(s->half_x, w->embed_tokens, token, batch, hidden_size);
     err = cudaGetLastError();
     if (err != cudaSuccess) {
         printf("%s\n", cudaGetErrorName(err));
     }
 
-    cudaDeviceSynchronize();
     // for(int l = 0; l < 1; l++) {
     for(int l = 0; l < p->num_hidden_layers; l++) {
         // attn_norm
@@ -914,11 +911,10 @@ void* qwen2_forward(Context *ctx, Qwen2* qwen2, int *token, int batch, int pos) 
         s->half_k = s->half_key_cache + offset_k;
         s->half_v = s->half_value_cache + offset_v;
 
-        // batch * p->num_hidden_layers * seq_len * num_heads * head_dim
+        linear_forward(s->half_q, s->half_xb, w->q_proj_w + l * hidden_size * (num_heads * head_dim) / 2, w->q_proj_b + l * (num_heads * head_dim), w->q_proj_w_s + l * (num_heads * head_dim), batch, hidden_size, num_heads * head_dim);        
 
-        linear_forward(s->half_q, s->half_xb, w->q_proj_w + l * hidden_size * (num_heads * head_dim), w->q_proj_b + l * (num_heads * head_dim), w->q_proj_w_s + l * (num_heads * head_dim), batch, hidden_size, num_heads * head_dim);        
-        linear_forward(s->half_k, s->half_xb, w->k_proj_w + l * hidden_size * (num_key_value_heads * head_dim), w->k_proj_b + l * (num_key_value_heads * head_dim), w->k_proj_w_s + l * (num_key_value_heads * head_dim), batch, hidden_size, num_key_value_heads * head_dim);
-        linear_forward(s->half_v, s->half_xb, w->v_proj_w + l * hidden_size * (num_key_value_heads * head_dim), w->v_proj_b + l * (num_key_value_heads * head_dim), w->v_proj_w_s + l * (num_key_value_heads * head_dim), batch, hidden_size, num_key_value_heads * head_dim);
+        linear_forward(s->half_k, s->half_xb, w->k_proj_w + l * hidden_size * (num_key_value_heads * head_dim) / 2, w->k_proj_b + l * (num_key_value_heads * head_dim), w->k_proj_w_s + l * (num_key_value_heads * head_dim), batch, hidden_size, num_key_value_heads * head_dim);
+        linear_forward(s->half_v, s->half_xb, w->v_proj_w + l * hidden_size * (num_key_value_heads * head_dim) / 2, w->v_proj_b + l * (num_key_value_heads * head_dim), w->v_proj_w_s + l * (num_key_value_heads * head_dim), batch, hidden_size, num_key_value_heads * head_dim);
 
         rope_half_forward<<<dim3(batch, num_heads), WARPGROUP_THREADS>>>(s->half_q, rope_theta, batch, num_heads, head_dim, pos);
         rope_half_forward<<<dim3(batch, num_key_value_heads), WARPGROUP_THREADS>>>(s->half_k, rope_theta, batch, num_heads, head_dim, pos);
@@ -927,19 +923,19 @@ void* qwen2_forward(Context *ctx, Qwen2* qwen2, int *token, int batch, int pos) 
                              batch, num_heads, num_key_value_heads, head_dim, num_heads, num_key_value_heads, max_seq_len, 
                              num_hidden_layers, l, pos);
 
-        linear_forward(s->half_xb2, s->half_xb, w->o_proj + l * (num_heads * head_dim) * hidden_size, NULL,  w->o_proj_s + l * hidden_size, batch, num_heads * head_dim, hidden_size);
+        linear_forward(s->half_xb2, s->half_xb, w->o_proj + l * (num_heads * head_dim) * hidden_size / 2, NULL,  w->o_proj_s + l * hidden_size, batch, num_heads * head_dim, hidden_size);
 
         residual_half_forward<<<dim3(batch, hidden_size / WARPGROUP_THREADS), WARPGROUP_THREADS>>>(s->half_x, s->half_xb2, batch, hidden_size);
 
         // ffn_norm
         rmsnorm_half_forward<<<dim3(batch, hidden_size / WARPGROUP_THREADS), WARPGROUP_THREADS>>>(s->half_xb, s->half_x, w->post_attention_layernorm + l*hidden_size, rms_norm_eps, batch, hidden_size);
 
-        linear_forward(s->half_hb, s->half_xb, w->gate_proj + l*intermediate_size*hidden_size, NULL, w->gate_proj_s + l*intermediate_size, batch, hidden_size, intermediate_size);
-        linear_forward(s->half_hb2, s->half_xb, w->up_proj + l*intermediate_size*hidden_size, NULL, w->up_proj_s + l*intermediate_size, batch, hidden_size, intermediate_size);
+        linear_forward(s->half_hb, s->half_xb, w->gate_proj + l*intermediate_size*hidden_size / 2, NULL, w->gate_proj_s + l*intermediate_size, batch, hidden_size, intermediate_size);
+        linear_forward(s->half_hb2, s->half_xb, w->up_proj + l*intermediate_size*hidden_size / 2, NULL, w->up_proj_s + l*intermediate_size, batch, hidden_size, intermediate_size);
 
         silu_half_forward<<<dim3(batch, intermediate_size / WARPGROUP_THREADS), WARPGROUP_THREADS>>>(s->half_hb, s->half_hb2, batch, intermediate_size);
 
-        linear_forward(s->half_xb, s->half_hb, w->down_proj + l* hidden_size * intermediate_size, NULL, w->down_proj_s + l* hidden_size, batch, intermediate_size, hidden_size);
+        linear_forward(s->half_xb, s->half_hb, w->down_proj + l* hidden_size * intermediate_size / 2, NULL, w->down_proj_s + l* hidden_size, batch, intermediate_size, hidden_size);
                 
         residual_half_forward<<<dim3(batch, hidden_size / WARPGROUP_THREADS), WARPGROUP_THREADS>>>(s->half_x, s->half_xb, batch, hidden_size);
 

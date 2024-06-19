@@ -1,53 +1,99 @@
 CC = nvcc
 
+EMPTY :=
+ifeq ($(LD_QWEN2_HOME),$(EMPTY))
+	export LD_QWEN2_HOME = $(shell pwd)/ld_qwen2_cache
+endif
+
+
+$(info "LD_QWEN2_HOME: $(LD_QWEN2_HOME)")
+
+LD_QWEN2_LIB_PATH=$(LD_QWEN2_HOME)/qwen2/lib
+$(info "LD_QWEN_LIB_PATH: $(LD_QWEN2_LIB_PATH)")
+
 qwen2: src/models/qwen2/qwen2.cu
-	$(CC) --shared -DWEIGHTS_DEBU -DARGMAX_DEBU -Xcompiler -fPIC --std=c++20 -o qwen2_fp16.so -O3 src/models/qwen2/qwen2.cu -I./ -lm -lcublas -lcublasLt  -gencode arch=compute_80,code=sm_80 
+	mkdir -p $(LD_QWEN2_LIB_PATH)
+	$(CC) --shared -DWEIGHTS_DEBU -DARGMAX_DEBU -Xcompiler -fPIC --std=c++20 -o libqwen2_fp16.so -O3 src/models/qwen2/qwen2.cu -I./ -lm -lcublas -lcublasLt  -gencode arch=compute_80,code=sm_80 
+	rm -rf $(LD_QWEN2_LIB_PATH)/libqwen2_fp16.so
+	mv libqwen2_fp16.so $(LD_QWEN2_LIB_PATH)/libqwen2_fp16.so
 
 qwen2_cpp: src/models/qwen2/qwen2.cpp
-	g++ --shared -DLINEAR_DEBU -D ARGMAX_DEBU -fPIC --std=c++20 -o qwen2_fp32.so -Ofast src/models/qwen2/qwen2.cpp -I./ -lm -fopenmp
-
-qwen2_v1: src/models/qwen2/qwen2.cpp
-	g++ --shared -DOPENMP_V1 -D ARGMAX_DEBU -fPIC --std=c++20 -o qwen2_fp32.so -Ofast src/models/qwen2/qwen2.cpp -I./ -lm -fopenmp
-
+	mkdir -p $(LD_QWEN2_LIB_PATH)
+	g++ --shared -DLINEAR_DEBU -D ARGMAX_DEBU -fPIC --std=c++20 -o libqwen2_fp32.so -Ofast src/models/qwen2/qwen2.cpp -I./ -lm -fopenmp
+	rm -rf $(LD_QWEN2_LIB_PATH)/libqwen2_fp32.so
+	mv libqwen2_fp32.so $(LD_QWEN2_LIB_PATH)/libqwen2_fp32.so
 
 qwen2_avx512: src/models/qwen2/qwen2.cpp
-	g++ --shared -DAVX512_FWD -D ARGMAX_DEBU -fPIC --std=c++20 -o qwen2_fp32.so -Ofast src/models/qwen2/qwen2.cpp -I./ -lm -fopenmp -mavx512f
-
+	mkdir -p $(LD_QWEN2_LIB_PATH)
+	g++ --shared -DAVX512_FWD -D ARGMAX_DEBU -fPIC --std=c++20 -o libqwen2_fp32.so -Ofast src/models/qwen2/qwen2.cpp -I./ -lm -fopenmp -mavx512f
+	rm -rf $(LD_QWEN2_LIB_PATH)/libqwen2_fp32.so
+	mv libqwen2_fp32.so $(LD_QWEN2_LIB_PATH)/libqwen2_fp32.so
+	
 qwen2_neon: src/models/qwen2/qwen2.cpp
-	g++ --shared -DNEON_FWD -D ARGMAX_DEBU -fPIC --std=c++20 -o qwen2_fp32.so -O3 src/models/qwen2/qwen2.cpp -I./ -lm -fopenmp
+	mkdir -p $(LD_QWEN2_LIB_PATH)
+	g++ --shared -DNEON_FWD -D ARGMAX_DEBU -fPIC --std=c++20 -o libqwen2_fp32.so -O3 src/models/qwen2/qwen2.cpp -I./ -lm -fopenmp
+	rm -rf $(LD_QWEN2_LIB_PATH)/libqwen2_fp32.so
+	mv libqwen2_fp32.so $(LD_QWEN2_LIB_PATH)/libqwen2_fp32.so
 
-cublas_W16A32: qwen2_cublas_W16A32.cu
-	$(CC) --shared -Xcompiler -fPIC --std=c++20 -o qwen2_fp16.so -O3 qwen2_cublas_W16A32.cu -lm -lcublas -lcublasLt -gencode arch=compute_80,code=sm_80 
+single_W16A32: single_deploy/qwen2_cublas_W16A32.cu
+	mkdir -p $(LD_QWEN2_LIB_PATH)
+	$(CC) --shared -Xcompiler -fPIC --std=c++20 -o libqwen2_fp16.so -O3 single_deploy/qwen2_cublas_W16A32.cu -lm -lcublas -lcublasLt -gencode arch=compute_80,code=sm_80 
+	rm -rf $(LD_QWEN2_LIB_PATH)/libqwen2_fp16.so
+	mv libqwen2_fp16.so $(LD_QWEN2_LIB_PATH)/libqwen2_fp16.so
 
-cublas_W16A16: qwen2_cublas_W16A16.cu
-	$(CC) --shared -Xcompiler -fPIC --std=c++20 -o qwen2_fp16.so -O3 qwen2_cublas_W16A16.cu -lm -lcublas -lcublasLt -gencode arch=compute_80,code=sm_80 
+single_W16A16: single_deploy/qwen2_cublas_W16A16.cu
+	mkdir -p $(LD_QWEN2_LIB_PATH)
+	$(CC) --shared -Xcompiler -fPIC --std=c++20 -o libqwen2_fp16.so -O3 single_deploy/qwen2_cublas_W16A16.cu -lm -lcublas -lcublasLt -gencode arch=compute_80,code=sm_80 
+	rm -rf $(LD_QWEN2_LIB_PATH)/libqwen2_fp16.so
+	mv libqwen2_fp16.so $(LD_QWEN2_LIB_PATH)/libqwen2_fp16.so
 
-cublas_W8A16: qwen2_cublas_W8A16.cu
-	$(CC) --shared -Xcompiler -fPIC --std=c++20 -o qwen2_q80.so -O3 qwen2_cublas_W8A16.cu -lm -lcublas -lcublasLt -gencode arch=compute_80,code=sm_80 
+single_W8A16: single_deploy/qwen2_cublas_W8A16.cu
+	mkdir -p $(LD_QWEN2_LIB_PATH)
+	$(CC) --shared -Xcompiler -fPIC --std=c++20 -o libqwen2_q80.so -O3 single_deploy/qwen2_cublas_W8A16.cu -lm -lcublas -lcublasLt -gencode arch=compute_80,code=sm_80 
+	rm -rf $(LD_QWEN2_LIB_PATH)/libqwen2_q80.so
+	mv libqwen2_q80.so $(LD_QWEN2_LIB_PATH)/libqwen2_q80.so
 
-cublas_W8A8: qwen2_cublas_W8A8.cu
-	$(CC) --shared -Xcompiler -fPIC --std=c++20 -o qwen2_q80.so -O3 qwen2_cublas_W8A8.cu -lm -lcublas -lcublasLt -gencode arch=compute_80,code=sm_80 
+single_W8A8: single_deploy/qwen2_cublas_W8A8.cu
+	mkdir -p $(LD_QWEN2_LIB_PATH)
+	$(CC) --shared -Xcompiler -fPIC --std=c++20 -o libqwen2_q80.so -O3 single_deploy/qwen2_cublas_W8A8.cu -lm -lcublas -lcublasLt -gencode arch=compute_80,code=sm_80 
+	rm -rf $(LD_QWEN2_LIB_PATH)/libqwen2_q80.so
+	mv libqwen2_q80.so $(LD_QWEN2_LIB_PATH)/libqwen2_q80.so
 
-v2: qwen2_v2.cu
-	$(CC) --shared -Xcompiler -fPIC --std=c++20 -o qwen2_fp16.so -O3 qwen2_v2.cu -lm -lcublas -lcublasLt -gencode arch=compute_80,code=sm_80
+single_v0: single_deploy/qwen2_v0.cu
+	mkdir -p $(LD_QWEN2_LIB_PATH)
+	$(CC) --shared -Xcompiler -fPIC --std=c++20 -o libqwen2_fp16.so -O3 single_deploy/qwen2_v0.cu -lm -gencode arch=compute_80,code=sm_80
+	rm -rf $(LD_QWEN2_LIB_PATH)/libqwen2_fp16.so
+	mv libqwen2_fp16.so $(LD_QWEN2_LIB_PATH)/libqwen2_fp16.so
 
-v3: qwen2_v3.cu
-	$(CC) --shared -Xcompiler -fPIC --std=c++20 -o qwen2_fp16.so -O3 qwen2_v3.cu -lm -lcublas -lcublasLt -gencode arch=compute_80,code=sm_80
+single_v1: single_deploy/qwen2_v1.cu
+	mkdir -p $(LD_QWEN2_LIB_PATH)
+	$(CC) --shared -Xcompiler -fPIC -std=c++20 -o libqwen2_fp16.so -O3 single_deploy/qwen2_v1.cu -lm -gencode arch=compute_80,code=sm_80
+	rm -rf $(LD_QWEN2_LIB_PATH)/libqwen2_fp16.so
+	mv libqwen2_fp16.so $(LD_QWEN2_LIB_PATH)/libqwen2_fp16.so
 
+single_v2: single_deploy/qwen2_v2.cu
+	mkdir -p $(LD_QWEN2_LIB_PATH)
+	$(CC) --shared -Xcompiler -fPIC --std=c++20 -o libqwen2_fp16.so -O3 single_deploy/qwen2_v2.cu -lm -lcublas -lcublasLt -gencode arch=compute_80,code=sm_80
+	rm -rf $(LD_QWEN2_LIB_PATH)/libqwen2_fp16.so
+	mv libqwen2_fp16.so $(LD_QWEN2_LIB_PATH)/libqwen2_fp16.so
 
-v0: qwen2_v0.cu
-	$(CC) --shared -Xcompiler -fPIC --std=c++20 -o qwen2_fp16.so -O3 qwen2_v0.cu -lm -gencode arch=compute_80,code=sm_80
+single_v3: single_deploy/qwen2_v3.cu
+	mkdir -p $(LD_QWEN2_LIB_PATH)
+	$(CC) --shared -Xcompiler -fPIC --std=c++20 -o libqwen2_fp16.so -O3 single_deploy/qwen2_v3.cu -lm -lcublas -lcublasLt -gencode arch=compute_80,code=sm_80
+	rm -rf $(LD_QWEN2_LIB_PATH)/libqwen2_fp16.so
+	mv libqwen2_fp16.so $(LD_QWEN2_LIB_PATH)/libqwen2_fp16.so
 
-v1: qwen2_v1.cu
-	$(CC) --shared -Xcompiler -fPIC -std=c++20 -o qwen2_fp16.so -O3 qwen2_v1.cu -lm -gencode arch=compute_80,code=sm_80
+single_q80: single_deploy/qwen2_q80.cu
+	mkdir -p $(LD_QWEN2_LIB_PATH)
+	$(CC) --shared -Xcompiler -fPIC -std=c++20 -o libqwen2_q80.so -O3 single_deploy/qwen2_q80.cu -lm -gencode arch=compute_80,code=sm_80
 
-q80: qwen2_q80.cu
-	$(CC) --shared -Xcompiler -fPIC -std=c++20 -o qwen2_q80.so -O3 qwen2_q80.cu -lm -gencode arch=compute_80,code=sm_80
+single_q40: single_deploy/qwen2_q40.cu
+	mkdir -p $(LD_QWEN2_LIB_PATH)
+	$(CC) --shared -Xcompiler -fPIC -std=c++20 -o libqwen2_q40.so -O3 single_deploy/qwen2_q40.cu -lm -gencode arch=compute_80,code=sm_80
+	rm -rf $(LD_QWEN2_LIB_PATH)/libqwen2_q40.so
+	mv libqwen2_q40.so $(LD_QWEN2_LIB_PATH)/libqwen2_q40.so
 
-q40: qwen2_q40.cu
-	$(CC) --shared -Xcompiler -fPIC -std=c++20 -o qwen2_q40.so -O3 qwen2_q40.cu -lm -gencode arch=compute_80,code=sm_80
-
-all: v0 v1 v2 v3 q80 q40 cublas
+all: qwen2_cpp single_W16A16 single_W8A16
 
 run:
 	ncu --help
@@ -57,4 +103,4 @@ b:
 	python stat-csv.py
 
 clean:
-	rm -rf *.log *.nsys-rep *.sqlite *.so *.csv
+	rm -rf *.log *.nsys-rep *.sqlite *.so *.csv $(LD_QWEN2_LIB_PATH)/* *.bin

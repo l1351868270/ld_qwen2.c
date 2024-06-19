@@ -12,7 +12,7 @@ from transformers import AutoTokenizer
 from ctypes import CDLL
 from ctypes import c_int, c_char_p, POINTER, create_string_buffer
 
-from run import CLDQwen2, parse_args
+from tools.run import CLDQwen2, parse_args
 
 
 # ==================================================================

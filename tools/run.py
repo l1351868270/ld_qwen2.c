@@ -11,65 +11,77 @@ from ctypes import c_int, c_char_p, POINTER, create_string_buffer
 
 class CLDQwen2:
     def __init__(self, model_type: str, quantization_type: str, batch: int, max_seq_len: int):
-        self.qwen2_path = os.path.dirname(os.path.abspath(__file__))
+        self.qwen2_path = os.environ.get("LD_QWEN2_HOME", os.path.join(os.path.dirname(os.path.abspath(__file__)), "../ld_qwen2_cache", "qwen2"))
+
+        print(f"qwen2_path: {self.qwen2_path}")
+
+        if not os.path.exists(self.qwen2_path):
+            os.makedirs(self.qwen2_path)
+
+        if not os.path.exists(os.path.join(self.qwen2_path, "lib")):
+            os.makedirs(os.path.join(self.qwen2_path, "lib"))
+        
+        if not os.path.exists(os.path.join(self.qwen2_path, "checkpoints")):
+            os.makedirs(os.path.join(self.qwen2_path, "checkpoints"))
+
         if quantization_type == "fp32":
-            self.qwen2lib = CDLL(os.path.join(self.qwen2_path, "./qwen2_fp32.so"))
+            self.qwen2lib = CDLL(os.path.join(self.qwen2_path, "lib", "libqwen2_fp32.so"))
         if quantization_type == "fp16":
-            self.qwen2lib = CDLL(os.path.join(self.qwen2_path, "./qwen2_fp16.so"))
+            self.qwen2lib = CDLL(os.path.join(self.qwen2_path, "lib", "libqwen2_fp16.so"))
         if quantization_type == "q80":
-            self.qwen2lib = CDLL(os.path.join(self.qwen2_path, "./qwen2_q80.so"))
+            self.qwen2lib = CDLL(os.path.join(self.qwen2_path, "lib", "libqwen2_q80.so"))
         if quantization_type == "q40":
-            self.qwen2lib = CDLL(os.path.join(self.qwen2_path, "./qwen2_q40.so"))
+            self.qwen2lib = CDLL(os.path.join(self.qwen2_path, "lib", "libqwen2_q40.so"))
 
         if quantization_type == "fp32":
             if model_type == "Qwen/Qwen1.5-0.5B-Chat":
-                self.checkpoint_path = os.path.join(self.qwen2_path, "qwen1.5-0.5B-fp32.bin")
+                self.checkpoint_path = os.path.join(self.qwen2_path, "checkpoints", "qwen1.5-0.5B-fp32.bin")
             if model_type == "Qwen/Qwen1.5-1.8B-Chat":
-                self.checkpoint_path = os.path.join(self.qwen2_path, "qwen1.5-1.8B-fp32.bin")
+                self.checkpoint_path = os.path.join(self.qwen2_path, "checkpoints", "qwen1.5-1.8B-fp32.bin")
             if model_type == "Qwen/Qwen1.5-4B-Chat":
-                self.checkpoint_path = os.path.join(self.qwen2_path, "qwen1.5-4B-fp32.bin")
+                self.checkpoint_path = os.path.join(self.qwen2_path, "checkpoints", "qwen1.5-4B-fp32.bin")
             if model_type == "Qwen/Qwen1.5-7B-Chat":
-                self.checkpoint_path = os.path.join(self.qwen2_path, "qwen1.5-7B-fp32.bin")
+                self.checkpoint_path = os.path.join(self.qwen2_path, "checkpoints", "qwen1.5-7B-fp32.bin")
             if model_type == "Qwen/Qwen1.5-14B-Chat":
-                self.checkpoint_path = os.path.join(self.qwen2_path, "qwen1.5-14B-fp32.bin")
+                self.checkpoint_path = os.path.join(self.qwen2_path, "checkpoints", "qwen1.5-14B-fp32.bin")
 
         if quantization_type == "fp16":
             if model_type == "Qwen/Qwen1.5-0.5B-Chat":
-                self.checkpoint_path = os.path.join(self.qwen2_path, "qwen1.5-0.5B.bin")
+                self.checkpoint_path = os.path.join(self.qwen2_path, "checkpoints", "qwen1.5-0.5B-fp16.bin")
             if model_type == "Qwen/Qwen1.5-1.8B-Chat":
-                self.checkpoint_path = os.path.join(self.qwen2_path, "qwen1.5-1.8B.bin")
+                self.checkpoint_path = os.path.join(self.qwen2_path, "checkpoints", "qwen1.5-1.8B-fp16.bin")
             if model_type == "Qwen/Qwen1.5-4B-Chat":
-                self.checkpoint_path = os.path.join(self.qwen2_path, "qwen1.5-4B.bin")
+                self.checkpoint_path = os.path.join(self.qwen2_path, "checkpoints", "qwen1.5-4B-fp16.bin")
             if model_type == "Qwen/Qwen1.5-7B-Chat":
-                self.checkpoint_path = os.path.join(self.qwen2_path, "qwen1.5-7B.bin")
+                self.checkpoint_path = os.path.join(self.qwen2_path, "checkpoints", "qwen1.5-7B-fp16.bin")
             if model_type == "Qwen/Qwen1.5-14B-Chat":
-                self.checkpoint_path = os.path.join(self.qwen2_path, "qwen1.5-14B.bin")
+                self.checkpoint_path = os.path.join(self.qwen2_path, "checkpoints", "qwen1.5-14B-fp16.bin")
         if quantization_type == "q40":
             if model_type == "Qwen/Qwen1.5-0.5B-Chat":
-                self.checkpoint_path = os.path.join(self.qwen2_path, "qwen1.5-0.5B-q40.bin")
+                self.checkpoint_path = os.path.join(self.qwen2_path, "checkpoints", "qwen1.5-0.5B-q40.bin")
             if model_type == "Qwen/Qwen1.5-1.8B-Chat":
-                self.checkpoint_path = os.path.join(self.qwen2_path, "qwen1.5-1.8B-q40.bin")
+                self.checkpoint_path = os.path.join(self.qwen2_path, "checkpoints", "qwen1.5-1.8B-q40.bin")
             if model_type == "Qwen/Qwen1.5-4B-Chat":
-                self.checkpoint_path = os.path.join(self.qwen2_path, "qwen1.5-4B-q40.bin")
+                self.checkpoint_path = os.path.join(self.qwen2_path, "checkpoints", "qwen1.5-4B-q40.bin")
             if model_type == "Qwen/Qwen1.5-7B-Chat":
-                self.checkpoint_path = os.path.join(self.qwen2_path, "qwen1.5-7B-q40.bin")
+                self.checkpoint_path = os.path.join(self.qwen2_path, "checkpoints", "qwen1.5-7B-q40.bin")
             if model_type == "Qwen/Qwen1.5-14B-Chat":
-                self.checkpoint_path = os.path.join(self.qwen2_path, "qwen1.5-14B-q40.bin")
+                self.checkpoint_path = os.path.join(self.qwen2_path, "checkpoints", "qwen1.5-14B-q40.bin")
             if model_type == "Qwen/Qwen1.5-32B-Chat":
-                self.checkpoint_path = os.path.join(self.qwen2_path, "qwen1.5-32B-q40.bin")
+                self.checkpoint_path = os.path.join(self.qwen2_path, "checkpoints", "qwen1.5-32B-q40.bin")
         if quantization_type == "q80":
             if model_type == "Qwen/Qwen1.5-0.5B-Chat":
-                self.checkpoint_path = os.path.join(self.qwen2_path, "qwen1.5-0.5B-q80.bin")
+                self.checkpoint_path = os.path.join(self.qwen2_path, "checkpoints", "qwen1.5-0.5B-q80.bin")
             if model_type == "Qwen/Qwen1.5-1.8B-Chat":
-                self.checkpoint_path = os.path.join(self.qwen2_path, "qwen1.5-1.8B-q80.bin")
+                self.checkpoint_path = os.path.join(self.qwen2_path, "checkpoints", "qwen1.5-1.8B-q80.bin")
             if model_type == "Qwen/Qwen1.5-4B-Chat":
-                self.checkpoint_path = os.path.join(self.qwen2_path, "qwen1.5-4B-q80.bin")
+                self.checkpoint_path = os.path.join(self.qwen2_path, "checkpoints", "qwen1.5-4B-q80.bin")
             if model_type == "Qwen/Qwen1.5-7B-Chat":
-                self.checkpoint_path = os.path.join(self.qwen2_path, "qwen1.5-7B-q80.bin")
+                self.checkpoint_path = os.path.join(self.qwen2_path, "checkpoints", "qwen1.5-7B-q80.bin")
             if model_type == "Qwen/Qwen1.5-14B-Chat":
-                self.checkpoint_path = os.path.join(self.qwen2_path, "qwen1.5-14B-q80.bin")
+                self.checkpoint_path = os.path.join(self.qwen2_path, "checkpoints", "qwen1.5-14B-q80.bin")
             if model_type == "Qwen/Qwen1.5-32B-Chat":
-                self.checkpoint_path = os.path.join(self.qwen2_path, "qwen1.5-32B-q80.bin")
+                self.checkpoint_path = os.path.join(self.qwen2_path, "checkpoints", "qwen1.5-32B-q80.bin")
 
         self.batch = batch
         self.max_seq_len = max_seq_len
@@ -245,8 +257,8 @@ def parse_args():
     return parser.parse_args()
 
 if __name__ == '__main__':
-    # python run.py -p "天空为什么是蓝色的" "天空为什么是蓝色的" "天空为什么是蓝色的" "天空为什么是蓝色的" "天空为什么是蓝色的" "天空为什么是蓝色的" "天空为什么是蓝色的" "天空为什么是蓝色的" "天空为什么是蓝色的" "天空为什么是蓝色的" "天空为什么是蓝色的" "天空为什么是蓝色的" "天空为什么是蓝色的" "天空为什么是蓝色的" "天空为什么是蓝色的" "天空为什么是蓝色的" --batch 16
-    # python run.py -p "天空为什么是蓝色的" -m "Qwen/Qwen1.5-32B-Chat" -q q40 --batch 1
+    # python tools/run.py -p "天空为什么是蓝色的" "天空为什么是蓝色的" "天空为什么是蓝色的" "天空为什么是蓝色的" "天空为什么是蓝色的" "天空为什么是蓝色的" "天空为什么是蓝色的" "天空为什么是蓝色的" "天空为什么是蓝色的" "天空为什么是蓝色的" "天空为什么是蓝色的" "天空为什么是蓝色的" "天空为什么是蓝色的" "天空为什么是蓝色的" "天空为什么是蓝色的" "天空为什么是蓝色的" --batch 16
+    # python tools/run.py -p "天空为什么是蓝色的" -m "Qwen/Qwen1.5-0.5B-Chat" -q fp32 --batch 1
     args = parse_args()
     model_type = args.model_type
     quantization_type = args.quantization_type
@@ -256,8 +268,6 @@ if __name__ == '__main__':
 
     model = CLDQwen2(model_type, quantization_type, batch, max_seq_len)
     model.init()
-    tmp = model.tokenizer.decode([105681], skip_special_tokens=True,)
-    print(tmp)
 
     print("="*50)
     print("user:")

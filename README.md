@@ -1,5 +1,11 @@
 # ld_qwen2.c
 
+## 目录说明
+single_deploy: 单文件部署
+src: 模型部署文件
+tools: 工具文件，包括模型export, python run wrapper, demo等
+scripts: 脚本文件
+
 # 已完成
 ## CPU
 支持x86 avx512, aarch64 neon

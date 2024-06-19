@@ -19,4 +19,5 @@ data
 flagged
 
 qwen2_cublas_W8A8.cu
-scripts/
+
+ld_qwen2_cache/

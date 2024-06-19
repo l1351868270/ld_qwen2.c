@@ -12,7 +12,7 @@ from contextlib import asynccontextmanager
 from typing import Any, Dict, List, Literal, Optional, Union
 from transformers import AutoTokenizer, AutoModel
 from sse_starlette.sse import ServerSentEvent, EventSourceResponse
-from run import CLDQwen2, parse_args
+from tools.run import CLDQwen2, parse_args
 
 @asynccontextmanager
 async def lifespan(app: FastAPI): # collects GPU memory

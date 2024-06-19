@@ -1,6 +1,6 @@
 /*
-make cublas_W8A16
-python run.py --model_type=Qwen/Qwen1.5-0.5B-Chat --prompt="天空为什么是蓝色的,答案大于1000字" -q=q80
+nvcc --shared -Xcompiler -fPIC -o qwen2.so -O3 qwen2_v3.cu -lm -lcublas -lcublasLt -gencode arch=compute_80,code=sm_80 -gencode arch=compute_86,code=sm_86
+python run.py --model_type=Qwen/Qwen1.5-1.8B-Chat --prompt="天空为什么是蓝色的,答案大于1000字"
 */
 
 #include <time.h>
@@ -13,7 +13,7 @@ python run.py --model_type=Qwen/Qwen1.5-0.5B-Chat --prompt="天空为什么是�
 #include <cuda_fp16.h>
 #include <unistd.h>
 #include <sys/mman.h>
-#include "./dev/cuda/gemv_fwd/gemv_fast_fwd.cu"
+#include "../dev/cuda/gemv_fwd/gemv_fast_fwd.cu"
 #include <cublas_v2.h>
 #include <cublasLt.h>
 
@@ -44,23 +44,16 @@ typedef struct {
 
 typedef struct {
     half *embed_tokens;    // model.embed_tokens.weight
-    int8_t *q_proj_w;        // model.layers.{i}.self_attn.q_proj.weight
-    half *q_proj_w_s;
+    half *q_proj_w;        // model.layers.{i}.self_attn.q_proj.weight
     half *q_proj_b;        // model.layers.{i}.self_attn.q_proj.bias
-    int8_t *k_proj_w;        // model.layers.{i}.self_attn.k_proj.weight
-    half *k_proj_w_s;
+    half *k_proj_w;        // model.layers.{i}.self_attn.k_proj.weight
     half *k_proj_b;        // model.layers.{i}.self_attn.k_proj.bias
-    int8_t *v_proj_w;        // model.layers.{i}.self_attn.v_proj.weight
-    half *v_proj_w_s;
+    half *v_proj_w;        // model.layers.{i}.self_attn.v_proj.weight
     half *v_proj_b;        // model.layers.{i}.self_attn.v_proj.bias
-    int8_t *o_proj;          // model.layers.{i}.self_attn.o_proj.weight
-    half *o_proj_s; 
-    int8_t *gate_proj;       // model.layers.{i}.mlp.gate_proj.weight
-    half *gate_proj_s; 
-    int8_t *up_proj;                    // model.layers.{i}.mlp.up_proj.weight
-    half *up_proj_s;
-    int8_t *down_proj;                  // model.layers.{i}.mlp.down_proj.weight
-    half *down_proj_s; 
+    half *o_proj;          // model.layers.{i}.self_attn.o_proj.weight
+    half *gate_proj;       // model.layers.{i}.mlp.gate_proj.weight
+    half *up_proj;                    // model.layers.{i}.mlp.up_proj.weight
+    half *down_proj;                  // model.layers.{i}.mlp.down_proj.weight
     half *input_layernorm;            // model.layers.{i}.input_layernorm.weight
     half *post_attention_layernorm;   // model.layers.{i}.post_attention_layernorm.weight
     half *norm;            // model.norm.weight
@@ -90,7 +83,6 @@ typedef struct {
     int flops_sfu;
 
     int num_parameters;
-    cublasHandle_t *handle;
 } RunState;
 
 typedef struct {
@@ -174,176 +166,120 @@ void memory_map_weights(Qwen2Weights *w, Qwen2Config* p, char* ptr) {
     ptr += sizeof(unsigned long long);
     cudaMemcpy(&ll_bytes, ptr, sizeof(unsigned long long), cudaMemcpyDeviceToHost);
     ptr += sizeof(unsigned long long);
-    printf("embed_tokens length: %llu\n", ll);
-    printf("embed_tokens bytes: %llu\n", ll_bytes);
+    // printf("++++++++++++--------%llu\n", ll);
+    // printf("++++++++++++--------%llu\n", ll_bytes);
     w->embed_tokens = (half*)ptr;
     ptr += ll_bytes;
     cudaMemcpy(&ll, ptr, sizeof(unsigned long long), cudaMemcpyDeviceToHost);
     ptr += sizeof(unsigned long long);
     cudaMemcpy(&ll_bytes, ptr, sizeof(unsigned long long), cudaMemcpyDeviceToHost);
     ptr += sizeof(unsigned long long);
-    printf("q_proj_w length: %llu\n", ll);
-    printf("q_proj_w bytes: %llu\n", ll_bytes);
-    w->q_proj_w = (int8_t*)ptr;
+    // printf("++++++++++++--------%llu\n", ll);
+    // printf("++++++++++++--------%llu\n", ll_bytes);
+    w->q_proj_w = (half*)ptr;
     ptr += ll_bytes;
     cudaMemcpy(&ll, ptr, sizeof(unsigned long long), cudaMemcpyDeviceToHost);
     ptr += sizeof(unsigned long long);
     cudaMemcpy(&ll_bytes, ptr, sizeof(unsigned long long), cudaMemcpyDeviceToHost);
     ptr += sizeof(unsigned long long);
-    printf("q_proj_w_s length: %llu\n", ll);
-    printf("q_proj_w_s bytes: %llu\n", ll_bytes);
-    w->q_proj_w_s = (half*)ptr;
-    ptr += ll_bytes;
-    cudaMemcpy(&ll, ptr, sizeof(unsigned long long), cudaMemcpyDeviceToHost);
-    ptr += sizeof(unsigned long long);
-    cudaMemcpy(&ll_bytes, ptr, sizeof(unsigned long long), cudaMemcpyDeviceToHost);
-    ptr += sizeof(unsigned long long);
-    printf("q_proj_b length: %llu\n", ll);
-    printf("q_proj_b bytes: %llu\n", ll_bytes);
+    // printf("++++++++++++--------%llu\n", ll);
+    // printf("++++++++++++--------%llu\n", ll_bytes);
     w->q_proj_b = (half*)ptr;
     ptr += ll_bytes;
     cudaMemcpy(&ll, ptr, sizeof(unsigned long long), cudaMemcpyDeviceToHost);
     ptr += sizeof(unsigned long long);
     cudaMemcpy(&ll_bytes, ptr, sizeof(unsigned long long), cudaMemcpyDeviceToHost);
     ptr += sizeof(unsigned long long);
-    printf("k_proj_w length: %llu\n", ll);
-    printf("k_proj_w bytes: %llu\n", ll_bytes);
-    w->k_proj_w = (int8_t*)ptr;
+    // printf("++++++++++++--------%llu\n", ll);
+    // printf("++++++++++++--------%llu\n", ll_bytes);
+    w->k_proj_w = (half*)ptr;
     ptr += ll_bytes;
     cudaMemcpy(&ll, ptr, sizeof(unsigned long long), cudaMemcpyDeviceToHost);
     ptr += sizeof(unsigned long long);
     cudaMemcpy(&ll_bytes, ptr, sizeof(unsigned long long), cudaMemcpyDeviceToHost);
     ptr += sizeof(unsigned long long);
-    printf("k_proj_w_s length: %llu\n", ll);
-    printf("k_proj_w_s bytes: %llu\n", ll_bytes);
-    w->k_proj_w_s = (half*)ptr;
-    ptr += ll_bytes;
-    cudaMemcpy(&ll, ptr, sizeof(unsigned long long), cudaMemcpyDeviceToHost);
-    ptr += sizeof(unsigned long long);
-    cudaMemcpy(&ll_bytes, ptr, sizeof(unsigned long long), cudaMemcpyDeviceToHost);
-    ptr += sizeof(unsigned long long);
-    printf("k_proj_b length: %llu\n", ll);
-    printf("k_proj_b bytes: %llu\n", ll_bytes);
+    // printf("++++++++++++--------%llu\n", ll);
+    // printf("++++++++++++--------%llu\n", ll_bytes);
     w->k_proj_b = (half*)ptr;
     ptr += ll_bytes;
     cudaMemcpy(&ll, ptr, sizeof(unsigned long long), cudaMemcpyDeviceToHost);
     ptr += sizeof(unsigned long long);
     cudaMemcpy(&ll_bytes, ptr, sizeof(unsigned long long), cudaMemcpyDeviceToHost);
     ptr += sizeof(unsigned long long);
-    printf("v_proj_w length: %llu\n", ll);
-    printf("v_proj_w bytes: %llu\n", ll_bytes);
-    w->v_proj_w = (int8_t*)ptr;
+    // printf("++++++++++++--------%llu\n", ll);
+    // printf("++++++++++++--------%llu\n", ll_bytes);
+    w->v_proj_w = (half*)ptr;
     ptr += ll_bytes;
     cudaMemcpy(&ll, ptr, sizeof(unsigned long long), cudaMemcpyDeviceToHost);
     ptr += sizeof(unsigned long long);
     cudaMemcpy(&ll_bytes, ptr, sizeof(unsigned long long), cudaMemcpyDeviceToHost);
     ptr += sizeof(unsigned long long);
-    printf("v_proj_w_s length: %llu\n", ll);
-    printf("v_proj_w_s bytes: %llu\n", ll_bytes);
-    w->v_proj_w_s = (half*)ptr;
-    ptr += ll_bytes;
-    cudaMemcpy(&ll, ptr, sizeof(unsigned long long), cudaMemcpyDeviceToHost);
-    ptr += sizeof(unsigned long long);
-    cudaMemcpy(&ll_bytes, ptr, sizeof(unsigned long long), cudaMemcpyDeviceToHost);
-    ptr += sizeof(unsigned long long);
-    printf("v_proj_b length: %llu\n", ll);
-    printf("v_proj_b bytes: %llu\n", ll_bytes);
+    // printf("++++++++++++--------%llu\n", ll);
+    // printf("++++++++++++--------%llu\n", ll_bytes);
     w->v_proj_b = (half*)ptr;
     ptr += ll_bytes;
     cudaMemcpy(&ll, ptr, sizeof(unsigned long long), cudaMemcpyDeviceToHost);
     ptr += sizeof(unsigned long long);
     cudaMemcpy(&ll_bytes, ptr, sizeof(unsigned long long), cudaMemcpyDeviceToHost);
     ptr += sizeof(unsigned long long);
-    printf("o_proj length: %llu\n", ll);
-    printf("o_proj bytes: %llu\n", ll_bytes);
-    w->o_proj = (int8_t*)ptr;
+    // printf("++++++++++++--------%llu\n", ll);
+    // printf("++++++++++++--------%llu\n", ll_bytes);
+    w->o_proj = (half*)ptr;
     ptr += ll_bytes;
     cudaMemcpy(&ll, ptr, sizeof(unsigned long long), cudaMemcpyDeviceToHost);
     ptr += sizeof(unsigned long long);
     cudaMemcpy(&ll_bytes, ptr, sizeof(unsigned long long), cudaMemcpyDeviceToHost);
     ptr += sizeof(unsigned long long);
-    printf("o_proj_s length: %llu\n", ll);
-    printf("o_proj_s bytes: %llu\n", ll_bytes);
-    w->o_proj_s = (half*)ptr;
+    // printf("++++++++++++--------%llu\n", ll);
+    // printf("++++++++++++--------%llu\n", ll_bytes);
+    w->gate_proj = (half*)ptr;
     ptr += ll_bytes;
     cudaMemcpy(&ll, ptr, sizeof(unsigned long long), cudaMemcpyDeviceToHost);
     ptr += sizeof(unsigned long long);
     cudaMemcpy(&ll_bytes, ptr, sizeof(unsigned long long), cudaMemcpyDeviceToHost);
     ptr += sizeof(unsigned long long);
-    printf("gate_proj length: %llu\n", ll);
-    printf("gate_proj bytes: %llu\n", ll_bytes);
-    w->gate_proj = (int8_t*)ptr;
+    // printf("++++++++++++--------%llu\n", ll);
+    // printf("++++++++++++--------%llu\n", ll_bytes);
+    w->up_proj = (half*)ptr;
     ptr += ll_bytes;
     cudaMemcpy(&ll, ptr, sizeof(unsigned long long), cudaMemcpyDeviceToHost);
     ptr += sizeof(unsigned long long);
     cudaMemcpy(&ll_bytes, ptr, sizeof(unsigned long long), cudaMemcpyDeviceToHost);
     ptr += sizeof(unsigned long long);
-    printf("gate_proj_s length: %llu\n", ll);
-    printf("gate_proj_s bytes: %llu\n", ll_bytes);
-    w->gate_proj_s = (half*)ptr;
+    // printf("++++++++++++--------%llu\n", ll);
+    // printf("++++++++++++--------%llu\n", ll_bytes);
+    w->down_proj = (half*)ptr;
     ptr += ll_bytes;
     cudaMemcpy(&ll, ptr, sizeof(unsigned long long), cudaMemcpyDeviceToHost);
     ptr += sizeof(unsigned long long);
     cudaMemcpy(&ll_bytes, ptr, sizeof(unsigned long long), cudaMemcpyDeviceToHost);
     ptr += sizeof(unsigned long long);
-    printf("up_proj length: %llu\n", ll);
-    printf("up_proj bytes: %llu\n", ll_bytes);
-    w->up_proj = (int8_t*)ptr;
-    ptr += ll_bytes;
-    cudaMemcpy(&ll, ptr, sizeof(unsigned long long), cudaMemcpyDeviceToHost);
-    ptr += sizeof(unsigned long long);
-    cudaMemcpy(&ll_bytes, ptr, sizeof(unsigned long long), cudaMemcpyDeviceToHost);
-    ptr += sizeof(unsigned long long);
-    printf("up_proj_s length: %llu\n", ll);
-    printf("up_proj_s bytes: %llu\n", ll_bytes);
-    w->up_proj_s = (half*)ptr;
-    ptr += ll_bytes;
-    cudaMemcpy(&ll, ptr, sizeof(unsigned long long), cudaMemcpyDeviceToHost);
-    ptr += sizeof(unsigned long long);
-    cudaMemcpy(&ll_bytes, ptr, sizeof(unsigned long long), cudaMemcpyDeviceToHost);
-    ptr += sizeof(unsigned long long);
-    printf("down_proj length: %llu\n", ll);
-    printf("down_proj bytes: %llu\n", ll_bytes);
-    w->down_proj = (int8_t*)ptr;
-    ptr += ll_bytes;
-    cudaMemcpy(&ll, ptr, sizeof(unsigned long long), cudaMemcpyDeviceToHost);
-    ptr += sizeof(unsigned long long);
-    cudaMemcpy(&ll_bytes, ptr, sizeof(unsigned long long), cudaMemcpyDeviceToHost);
-    ptr += sizeof(unsigned long long);
-    printf("down_proj_s length: %llu\n", ll);
-    printf("down_proj_s bytes: %llu\n", ll_bytes);
-    w->down_proj_s = (half*)ptr;
-    ptr += ll_bytes;
-    cudaMemcpy(&ll, ptr, sizeof(unsigned long long), cudaMemcpyDeviceToHost);
-    ptr += sizeof(unsigned long long);
-    cudaMemcpy(&ll_bytes, ptr, sizeof(unsigned long long), cudaMemcpyDeviceToHost);
-    ptr += sizeof(unsigned long long);
-    printf("input_layernorm length: %llu\n", ll);
-    printf("input_layernorm bytes: %llu\n", ll_bytes);
+    // printf("++++++++++++--------%llu\n", ll);
+    // printf("++++++++++++--------%llu\n", ll_bytes);
     w->input_layernorm = (half*)ptr;
     ptr += ll_bytes;
     cudaMemcpy(&ll, ptr, sizeof(unsigned long long), cudaMemcpyDeviceToHost);
     ptr += sizeof(unsigned long long);
     cudaMemcpy(&ll_bytes, ptr, sizeof(unsigned long long), cudaMemcpyDeviceToHost);
     ptr += sizeof(unsigned long long);
-    printf("post_attention_layernorm length: %llu\n", ll);
-    printf("post_attention_layernorm bytes: %llu\n", ll_bytes);
+    // printf("++++++++++++--------%llu\n", ll);
+    // printf("++++++++++++--------%llu\n", ll_bytes);
     w->post_attention_layernorm = (half*)ptr;
     ptr += ll_bytes;
     cudaMemcpy(&ll, ptr, sizeof(unsigned long long), cudaMemcpyDeviceToHost);
     ptr += sizeof(unsigned long long);
     cudaMemcpy(&ll_bytes, ptr, sizeof(unsigned long long), cudaMemcpyDeviceToHost);
     ptr += sizeof(unsigned long long);
-    printf("norm length: %llu\n", ll);
-    printf("norm bytes: %llu\n", ll_bytes);
+    // printf("++++++++++++--------%llu\n", ll);
+    // printf("++++++++++++--------%llu\n", ll_bytes);
     w->norm = (half*)ptr;
     ptr += ll_bytes;
     cudaMemcpy(&ll, ptr, sizeof(unsigned long long), cudaMemcpyDeviceToHost);
     ptr += sizeof(unsigned long long);
     cudaMemcpy(&ll_bytes, ptr, sizeof(unsigned long long), cudaMemcpyDeviceToHost);
     ptr += sizeof(unsigned long long);
-    printf("lm_head length: %llu\n", ll);
-    printf("lm_head bytes: %llu\n", ll_bytes);
+    // printf("++++++++++++--------%llu\n", ll);
+    // printf("++++++++++++--------%llu\n", ll_bytes);
     w->lm_head = (half*)ptr;
 }
 
@@ -551,48 +487,26 @@ void rmsnorm_half_forward(half* o, half* x, half *weight, float rms_norm_eps, in
 
 __global__ 
 void add_half_forward(half* output, half* input) {
-    int b = blockIdx.x;
-    int dim = WARPGROUP_THREADS * gridDim.y;
-    int bid = blockIdx.y;
+    int bid = blockIdx.x;
     int tid = threadIdx.x;
-    int offset_o = b * dim + bid * WARPGROUP_THREADS + tid;
-    int offset_i = bid * WARPGROUP_THREADS + tid;
-    output[offset_o] += input[offset_i];
+    int offset = bid * WARPGROUP_THREADS + tid;
+    output[offset] += input[offset];
 }
 
 // https://pytorch.org/docs/stable/generated/torch.nn.Linear.html
-void linear_forward(cublasHandle_t *handle, half* output, half* input, int8_t *weight, half* bias, half* scale, int batch, int in_features, int out_features) {
+void linear_half_forward(half* output, half* input, half *weight, half* bias, int batch, int in_features, int out_features) {
     int M = batch;
     int N = out_features;
     int K = in_features;
 
-    gemv::gemv_fast_q80_fwd(output, input, weight, scale, M, N, K);
 
-    if (bias != NULL) {
-        add_half_forward<<<dim3(batch, out_features / WARPGROUP_THREADS), WARPGROUP_THREADS>>>(output, bias);
-    }
+    gemv::gemv_fast_v1_fwd(output, input, weight, M, N, K);
 
-    // half *H_C = (half*)malloc(batch * out_features * sizeof(half));
-    // printf("linear_forward in_features:%d out_features:%d\n", in_features, out_features);
-    // cudaMemcpy(H_C, output, batch * out_features * sizeof(half), cudaMemcpyDeviceToHost);
-    // for (int b = 0; b < batch; b++) {
-    //     printf("[");
-    //     for (int i = 0; i < out_features; i++) {
-    //         printf("%f, ", __half2float(H_C[b * out_features + i]));
-    //     }
-    //     printf("]\n");
-    // }
-}
-
-void linear_half_forward(cublasHandle_t *handle, half* output, half* input, half *weight, half* bias, int batch, int in_features, int out_features) {
-    int M = batch;
-    int N = out_features;
-    int K = in_features;
-
-    // gemv::gemv_fast_v1_fwd(output, input, weight, M, N, K);
-
-    float alpha = 1.f;
-    float beta = 0.0f;
+    // cublasHandle_t handle;
+    // cublasCreate(&handle);
+    
+    // float alpha = 1.f;
+    // float beta = 0.0f;
 
     // cublasStatus_t status = cublasSgemmEx(handle, CUBLAS_OP_T, CUBLAS_OP_N, 
     //                                       M, N, K,
@@ -601,17 +515,18 @@ void linear_half_forward(cublasHandle_t *handle, half* output, half* input, half
     //                                       weight, CUDA_R_16F, K, 
     //                                       &beta, 
     //                                       output, CUDA_R_16F, M);
-
-    cublasStatus_t status = cublasSgemmEx(*handle, CUBLAS_OP_T, CUBLAS_OP_N, 
-                                          N, M, K,
-                                          &alpha, 
-                                          weight, CUDA_R_16F, K, 
-                                          input, CUDA_R_16F, K, 
-                                          &beta, 
-                                          output, CUDA_R_16F, N);
+    // cublasDestroy(handle);
+    // cublasStatus_t status = cublasSgemmEx(*handle, CUBLAS_OP_T, CUBLAS_OP_N, 
+    //                                       N, M, K,
+    //                                       &alpha, 
+    //                                       weight, CUDA_R_16F, K, 
+    //                                       input, CUDA_R_16F, K, 
+    //                                       &beta, 
+    //                                       output, CUDA_R_32F, N);
 
     if (bias != NULL) {
-        add_half_forward<<<dim3(batch, out_features / WARPGROUP_THREADS), WARPGROUP_THREADS>>>(output, bias);
+        // printf("linear_half_forward in_features:%d out_features:%d\n", in_features, out_features);
+        add_half_forward<<<out_features / WARPGROUP_THREADS, WARPGROUP_THREADS>>>(output, bias);
     }
 
     // half *H_C = (half*)malloc(batch * out_features * sizeof(half));
@@ -719,8 +634,6 @@ void group_flash_attention_half_forward(half* output, half *half_q, half *key_ca
         o[lv] = __half2float(value_cache[offset_v + lv]);
         output[offset_o + lv] = __float2half(o[lv]);
     }
-
-    
     
     // flash attention
     float m_i1 = 0.0f;
@@ -889,7 +802,7 @@ void argmax_half_forward(int* output, half* input, int batch, int dim) {
 }
 
 
-void* qwen2_forward(Context *ctx, cublasHandle_t *handle, Qwen2* qwen2, int *token, int batch, int pos) {
+void* qwen2_forward(Context *ctx, Qwen2* qwen2, int *token, int batch, int pos) {
     Qwen2Config *p = &qwen2->config;
     Qwen2Weights *w = &qwen2->weights;
     RunState* s = &qwen2->state;
@@ -928,20 +841,21 @@ void* qwen2_forward(Context *ctx, cublasHandle_t *handle, Qwen2* qwen2, int *tok
     // for(int l = 0; l < 1; l++) {
     for(int l = 0; l < p->num_hidden_layers; l++) {
         // attn_norm
+        // rmsnorm_forward<<<dim3(batch, hidden_size / WARPGROUP_THREADS), WARPGROUP_THREADS>>>(s->xb, s->x, w->input_layernorm + l*hidden_size, rms_norm_eps, batch, hidden_size);
         rmsnorm_half_forward<<<dim3(batch, hidden_size / WARPGROUP_THREADS), WARPGROUP_THREADS>>>(s->half_xb, s->half_x, w->input_layernorm + l*hidden_size, rms_norm_eps, batch, hidden_size);
 
-        int offset_k = l * max_seq_len * batch * num_key_value_heads * head_dim 
+        int offset_k = l * max_seq_len * batch *num_key_value_heads * head_dim 
                          + pos * batch * num_key_value_heads * head_dim;
         int offset_v = l * max_seq_len * batch * num_key_value_heads * head_dim 
-                         + pos * batch * num_key_value_heads * head_dim;
+                         + pos * batch* num_key_value_heads * head_dim;
         s->half_k = s->half_key_cache + offset_k;
         s->half_v = s->half_value_cache + offset_v;
 
         // batch * p->num_hidden_layers * seq_len * num_heads * head_dim
 
-        linear_forward(s->handle, s->half_q, s->half_xb, w->q_proj_w + l * hidden_size * (num_heads * head_dim), w->q_proj_b + l * (num_heads * head_dim), w->q_proj_w_s + l * (num_heads * head_dim), batch, hidden_size, num_heads * head_dim);        
-        linear_forward(s->handle, s->half_k, s->half_xb, w->k_proj_w + l * hidden_size * (num_key_value_heads * head_dim), w->k_proj_b + l * (num_key_value_heads * head_dim), w->k_proj_w_s + l * (num_key_value_heads * head_dim), batch, hidden_size, num_key_value_heads * head_dim);
-        linear_forward(s->handle, s->half_v, s->half_xb, w->v_proj_w + l * hidden_size * (num_key_value_heads * head_dim), w->v_proj_b + l * (num_key_value_heads * head_dim), w->v_proj_w_s + l * (num_key_value_heads * head_dim), batch, hidden_size, num_key_value_heads * head_dim);
+        linear_half_forward(s->half_q, s->half_xb, w->q_proj_w + l * hidden_size * (num_heads * head_dim), w->q_proj_b + l * (num_heads * head_dim), batch, hidden_size, num_heads * head_dim);        
+        linear_half_forward(s->half_k, s->half_xb, w->k_proj_w + l * hidden_size * (num_key_value_heads * head_dim), w->k_proj_b + l * (num_key_value_heads * head_dim), batch, hidden_size, num_key_value_heads * head_dim);
+        linear_half_forward(s->half_v, s->half_xb, w->v_proj_w + l * hidden_size * (num_key_value_heads * head_dim), w->v_proj_b + l * (num_key_value_heads * head_dim), batch, hidden_size, num_key_value_heads * head_dim);
 
         rope_half_forward<<<dim3(batch, num_heads), WARPGROUP_THREADS>>>(s->half_q, rope_theta, batch, num_heads, head_dim, pos);
         rope_half_forward<<<dim3(batch, num_key_value_heads), WARPGROUP_THREADS>>>(s->half_k, rope_theta, batch, num_heads, head_dim, pos);
@@ -950,19 +864,19 @@ void* qwen2_forward(Context *ctx, cublasHandle_t *handle, Qwen2* qwen2, int *tok
                              batch, num_heads, num_key_value_heads, head_dim, num_heads, num_key_value_heads, max_seq_len, 
                              num_hidden_layers, l, pos);
 
-        linear_forward(s->handle, s->half_xb2, s->half_xb, w->o_proj + l * (num_heads * head_dim) * hidden_size, NULL,  w->o_proj_s + l * hidden_size, batch, num_heads * head_dim, hidden_size);
+        linear_half_forward(s->half_xb2, s->half_xb, w->o_proj + l * (num_heads * head_dim) * hidden_size, NULL, batch, num_heads * head_dim, hidden_size);
 
         residual_half_forward<<<dim3(batch, hidden_size / WARPGROUP_THREADS), WARPGROUP_THREADS>>>(s->half_x, s->half_xb2, batch, hidden_size);
 
         // ffn_norm
         rmsnorm_half_forward<<<dim3(batch, hidden_size / WARPGROUP_THREADS), WARPGROUP_THREADS>>>(s->half_xb, s->half_x, w->post_attention_layernorm + l*hidden_size, rms_norm_eps, batch, hidden_size);
 
-        linear_forward(s->handle, s->half_hb, s->half_xb, w->gate_proj + l*intermediate_size*hidden_size, NULL, w->gate_proj_s + l*intermediate_size, batch, hidden_size, intermediate_size);
-        linear_forward(s->handle, s->half_hb2, s->half_xb, w->up_proj + l*intermediate_size*hidden_size, NULL, w->up_proj_s + l*intermediate_size, batch, hidden_size, intermediate_size);
+        linear_half_forward(s->half_hb, s->half_xb, w->gate_proj + l*intermediate_size*hidden_size, NULL, batch, hidden_size, intermediate_size);
+        linear_half_forward(s->half_hb2, s->half_xb, w->up_proj + l*intermediate_size*hidden_size, NULL, batch, hidden_size, intermediate_size);
 
         silu_half_forward<<<dim3(batch, intermediate_size / WARPGROUP_THREADS), WARPGROUP_THREADS>>>(s->half_hb, s->half_hb2, batch, intermediate_size);
 
-        linear_forward(s->handle, s->half_xb, s->half_hb, w->down_proj + l* hidden_size * intermediate_size, NULL, w->down_proj_s + l* hidden_size, batch, intermediate_size, hidden_size);
+        linear_half_forward(s->half_xb, s->half_hb, w->down_proj + l* hidden_size * intermediate_size, NULL, batch, intermediate_size, hidden_size);
                 
         residual_half_forward<<<dim3(batch, hidden_size / WARPGROUP_THREADS), WARPGROUP_THREADS>>>(s->half_x, s->half_xb, batch, hidden_size);
 
@@ -972,14 +886,13 @@ void* qwen2_forward(Context *ctx, cublasHandle_t *handle, Qwen2* qwen2, int *tok
 
     rmsnorm_half_forward<<<dim3(batch, hidden_size / WARPGROUP_THREADS), WARPGROUP_THREADS>>>(s->half_x, s->half_x, w->norm, rms_norm_eps, batch, hidden_size);
 
-    linear_half_forward(s->handle, s->half_logits, s->half_x, w->lm_head, NULL, batch, hidden_size, vocab_size);
+    linear_half_forward(s->half_logits, s->half_x, w->lm_head, NULL, batch, hidden_size, vocab_size);
 
     return s->half_logits;
 }
 
 
 Qwen2 py_model;
-cublasHandle_t handle;
 
 void c_init(int batch, int max_seq_len, const char *checkpoint_path) {
     printf("checkpoint_path: %s\n", checkpoint_path);
@@ -991,10 +904,7 @@ void c_init(int batch, int max_seq_len, const char *checkpoint_path) {
     py_model.state.batch = batch;
     py_model.state.max_seq_len = max_seq_len;
 
-    cublasCreate(&handle);
-    py_model.state.handle = &handle;
     malloc_run_state(&py_model.state, &py_model.config);
-    // cublasDestroy(handle);
 }
 
 // void get_mod
@@ -1010,7 +920,7 @@ int* c_qwen2_forward(int batch, int seq_len, int *data, int pos) {
     }
     
     Context ctx;
-    qwen2_forward(&ctx, s->handle, &py_model, s->token, batch, pos);
+    qwen2_forward(&ctx, &py_model, s->token, batch, pos);
     // cudaDeviceSynchronize();
     argmax_half_forward<<<s->batch, WARPGROUP_THREADS>>>(s->next, s->half_logits, s->batch, py_model.config.vocab_size);
     cudaDeviceSynchronize();
