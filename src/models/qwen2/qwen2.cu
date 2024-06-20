@@ -24,6 +24,10 @@ python run.py --model_type=Qwen/Qwen1.5-0.5B-Chat --prompt="天空为什么是�
 #include "./src/kernels/cuda/silu_half.cuh"
 #include "./src/kernels/cuda/argmax_half.cuh"
 
+// #ifdef ENABLE_MPI
+#include <mpi.h>
+// #endif
+
 extern "C" {
     void c_init(int batch, int max_seq_len, const char *checkpoint_path);
     int* c_qwen2_forward(int batch, int seq_len, int *data, int pos);

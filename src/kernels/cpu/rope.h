@@ -201,10 +201,10 @@ void rope_fwd(float *q, float rope_freq_constant, int batch, int num_heads, int 
 #elif OPENMP_V1
     ropeV1_fwd(q, rope_freq_constant, batch, num_heads, head_dim, pos);
 #else
-    double tdata = omp_get_wtime();
+    // double tdata = omp_get_wtime();
     ropeV2_fwd(q, rope_freq_constant, batch, num_heads, head_dim, pos);
-    tdata = omp_get_wtime() - tdata;
-    printf("batch=%d, num_heads=%d, head_dim=%d,  in %f secs\n", batch, num_heads, head_dim, tdata);
+    // tdata = omp_get_wtime() - tdata;
+    // printf("batch=%d, num_heads=%d, head_dim=%d,  in %f secs\n", batch, num_heads, head_dim, tdata);
 #endif
 }
 

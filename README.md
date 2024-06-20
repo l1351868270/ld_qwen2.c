@@ -95,8 +95,9 @@ continuous batch / in-flight batch
 [AWQ](https://arxiv.org/pdf/2306.00978)
 
 ## 高性能计算
-[cs267]
-https://sites.google.com/lbl.gov/cs267-spr2023
+[cs267](https://sites.google.com/lbl.gov/cs267-spr2023)
+
+[深入理解并行编程(Is Parallel Programming Hard, And, If So, What Can You Do About It?)](https://cdn.kernel.org/pub/linux/kernel/people/paulmck/perfbook/perfbook.html)
 
 ## cuda
 [PTX](https://docs.nvidia.com/cuda/parallel-thread-execution/)

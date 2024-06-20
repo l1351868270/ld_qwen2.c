@@ -22,7 +22,7 @@ python run.py --model_type=Qwen/Qwen1.5-0.5B-Chat -q=fp32 --batch=1 --prompt="å¤
 #include "./src/kernels/cpu/argmax.h"
 
 #ifdef ENABLE_MPI
-include "mpi.h"
+#include <mpi.h>
 #endif
 
 extern "C" {
@@ -400,7 +400,18 @@ Qwen2 py_model;
 
 void c_init(int batch, int max_seq_len, const char *checkpoint_path) {
 #ifdef ENABLE_MPI
-    MPI_Init(NULL, NULL);
+    int err;
+    err = MPI_Init(NULL, NULL);
+    if (err != MPI_SUCCESS) {
+        std::cerr << "MPI_Init failed with error code: " << err << std::endl;
+        MPI_Abort(MPI_COMM_WORLD, err);
+    }
+    int rank, size;
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    MPI_Comm_size(MPI_COMM_WORLD, &size);
+    printf( "I am %d of %d\n", rank, size );
+    MPI_Finalize();
+    
 #endif
     printf("checkpoint_path: %s\n", checkpoint_path);
     if (checkpoint_path == NULL) {
