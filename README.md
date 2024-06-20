@@ -94,6 +94,10 @@ continuous batch / in-flight batch
 
 [AWQ](https://arxiv.org/pdf/2306.00978)
 
+## 高性能计算
+[cs267]
+https://sites.google.com/lbl.gov/cs267-spr2023
+
 ## cuda
 [PTX](https://docs.nvidia.com/cuda/parallel-thread-execution/)
 
