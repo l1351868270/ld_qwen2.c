@@ -2,6 +2,7 @@
 
 #include <math.h>
 #include "utils.h"
+#include <omp.h>
 
 #ifdef AVX512_FWD
 #include <immintrin.h>
@@ -64,16 +65,13 @@ void ropeV1_fwd(float *q, float rope_freq_constant, int batch, int num_heads, in
 }
 
 void ropeV2_fwd(float *q, float rope_freq_constant, int batch, int num_heads, int head_dim, int pos) {
-    // int b;
-    // #pragma omp parallel for private(b)
+    #pragma omp parallel for collapse(2) schedule(dynamic)
     for (int b = 0; b < batch; b++) {
-        int h;
-        #pragma omp parallel for private(h)
-        for (h = 0; h < num_heads; h++) {
+        // #pragma omp parallel for
+        for (int h = 0; h < num_heads; h++) {
             int offset = b * num_heads * head_dim + h * head_dim;
-            int hd;
-            #pragma omp parallel for private(hd)
-            for (hd = 0; hd < head_dim / 2; hd++) {
+            // #pragma omp parallel for
+            for (int hd = 0; hd < head_dim / 2; hd++) {
                 // https://arxiv.org/pdf/2104.09864
                 float v0 = q[offset + hd];
                 float v1 = q[offset + hd + head_dim / 2];
@@ -194,6 +192,7 @@ void rope_neon_fwd(float *q, float rope_freq_constant, int batch, int num_heads,
 }
 #endif
 
+
 void rope_fwd(float *q, float rope_freq_constant, int batch, int num_heads, int head_dim, int pos) {
 #ifdef AVX512_FWD
     rope_avx512_fwd(q, rope_freq_constant, batch, num_heads, head_dim, pos);
@@ -202,7 +201,10 @@ void rope_fwd(float *q, float rope_freq_constant, int batch, int num_heads, int 
 #elif OPENMP_V1
     ropeV1_fwd(q, rope_freq_constant, batch, num_heads, head_dim, pos);
 #else
+    // double tdata = omp_get_wtime();
     ropeV2_fwd(q, rope_freq_constant, batch, num_heads, head_dim, pos);
+    // tdata = omp_get_wtime() - tdata;
+    // printf("batch=%d, num_heads=%d, head_dim=%d,  in %f secs\n", batch, num_heads, head_dim, tdata);
 #endif
 }
 

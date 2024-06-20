@@ -16,12 +16,9 @@ namespace residual {
 
 void residualV1_fwd(float *x, float *xb, int batch, int dim) {
     int elem_per_cpu = dim / utils::NUM_CPUS;
-    // int b;
-    // #pragma omp parallel for private(b)
+    #pragma omp parallel for collapse(2)
     for (int b = 0; b < batch; b++) {
-        int t;
-        #pragma omp parallel for private(t)
-        for (t = 0; t < utils::NUM_CPUS; t++) {
+        for (int t = 0; t < utils::NUM_CPUS; t++) {
             for (int i = 0; i < elem_per_cpu; i++) {
                 int offset = b * dim + t * elem_per_cpu + i;
                 x[offset] += xb[offset];
@@ -44,12 +41,9 @@ void residualV1_fwd(float *x, float *xb, int batch, int dim) {
 }
 
 void residualV2_fwd(float *x, float *xb, int batch, int dim) {
-    // int b;
-    // #pragma omp parallel for private(b)
+    #pragma omp parallel for collapse(2)
     for (int b = 0; b < batch; b++) {
-        int d;
-        #pragma omp parallel for private(d)
-        for (d = 0; d < dim; d++) {
+        for (int d = 0; d < dim; d++) {
             int offset = b * dim + d;
             x[offset] += xb[offset];
         }
@@ -71,12 +65,9 @@ void residualV2_fwd(float *x, float *xb, int batch, int dim) {
 
 #ifdef AVX512_FWD
 void residual_avx512_fwd(float *x, float *xb, int batch, int dim) {
-    // int b;
-    // #pragma omp parallel for private(b)
+    #pragma omp parallel for collapse(2)
     for (int b = 0; b < batch; b++) {
-        int d;
-        #pragma omp parallel for private(d)
-        for (d = 0; d < dim; d += 16) {
+        for (int d = 0; d < dim; d += 16) {
             int offset = b * dim + d;
             _mm512_storeu_ps(x + offset, _mm512_add_ps(_mm512_loadu_ps(x + offset), _mm512_loadu_ps(xb + offset)));
         }
@@ -99,12 +90,9 @@ void residual_avx512_fwd(float *x, float *xb, int batch, int dim) {
 
 #ifdef NEON_FWD
 void residual_neon_fwd(float *x, float *xb, int batch, int dim) {
-    // int b;
-    // #pragma omp parallel for private(b)
+    #pragma omp parallel for collapse(2)
     for (int b = 0; b < batch; b++) {
-        int d;
-        #pragma omp parallel for private(d)
-        for (d = 0; d < dim; d += 4) {
+        for (int d = 0; d < dim; d += 4) {
             int offset = b * dim + d;
             vst1q_f32(x + offset, vaddq_f32(vld1q_f32(x + offset), vld1q_f32(xb + offset)));
         }

@@ -17,12 +17,9 @@ namespace embedding {
 template <typename T>
 void embeddingV1_fwd(T *x, T* embed_tokens, int *token, int batch, int dim) {
     int elem_per_cpu = dim / utils::NUM_CPUS;
-    // int b;
-    // #pragma omp parallel for private(b)
+    #pragma omp parallel for collapse(2)
     for (int b = 0; b < batch; b++) {
-        int t;
-        #pragma omp parallel for private(t)
-        for (t = 0; t < utils::NUM_CPUS; t++) {
+        for (int t = 0; t < utils::NUM_CPUS; t++) {
             for (int i = 0; i < elem_per_cpu; i++) {
                 int offset_x = b * dim + t * elem_per_cpu + i;
                 int offset_t = token[b] * dim + t * elem_per_cpu + i;
@@ -48,12 +45,9 @@ void embeddingV1_fwd(T *x, T* embed_tokens, int *token, int batch, int dim) {
 
 template <typename T>
 void embeddingV2_fwd(T *x, T* embed_tokens, int *token, int batch, int dim) {
-    // int b;
-    // #pragma omp parallel for private(b)
+    #pragma omp parallel for collapse(2)
     for (int b = 0; b < batch; b++) {
-        int d;
-        #pragma omp parallel for private(d)
-        for (d = 0; d < dim; d++) {
+        for (int d = 0; d < dim; d++) {
             int offset_x = b * dim + d;
             int offset_t = token[b] * dim + d;
             x[offset_x] = *(embed_tokens + offset_t);
@@ -78,12 +72,9 @@ void embeddingV2_fwd(T *x, T* embed_tokens, int *token, int batch, int dim) {
 #ifdef AVX512_FWD
 template <typename T>
 void embedding_avx512_fwd(T *x, T* embed_tokens, int *token, int batch, int dim) {
-    // int b;
-    // #pragma omp parallel for private(b)
+    #pragma omp parallel for collapse(2)
     for (int b = 0; b < batch; b++) {
-        int d;
-        #pragma omp parallel for private(d)
-        for (d = 0; d < dim; d += 16) {
+        for (int d = 0; d < dim; d += 16) {
             int offset_x = b * dim + d;
             int offset_t = token[b] * dim + d;
             _mm512_storeu_ps(x + offset_x, _mm512_loadu_ps(embed_tokens + offset_t));
@@ -109,12 +100,9 @@ void embedding_avx512_fwd(T *x, T* embed_tokens, int *token, int batch, int dim)
 #ifdef NEON_FWD
 template <typename T>
 void embedding_neon_fwd(T *x, T* embed_tokens, int *token, int batch, int dim) {
-    // int b;
-    // #pragma omp parallel for private(b)
+    #pragma omp parallel for collapse(2)
     for (int b = 0; b < batch; b++) {
-        int d;
-        #pragma omp parallel for private(d)
-        for (d = 0; d < dim; d += 4) {
+        for (int d = 0; d < dim; d += 4) {
             int offset_x = b * dim + d;
             int offset_t = token[b] * dim + d;
             x[offset_x] = *(embed_tokens + offset_t);

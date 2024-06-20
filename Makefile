@@ -13,25 +13,25 @@ $(info "LD_QWEN_LIB_PATH: $(LD_QWEN2_LIB_PATH)")
 
 qwen2: src/models/qwen2/qwen2.cu
 	mkdir -p $(LD_QWEN2_LIB_PATH)
-	$(CC) --shared -DWEIGHTS_DEBU -DARGMAX_DEBU -Xcompiler -fPIC --std=c++20 -o libqwen2_fp16.so -O3 src/models/qwen2/qwen2.cu -I./ -lm -lcublas -lcublasLt  -gencode arch=compute_80,code=sm_80 
+	$(CC) --shared -DWEIGHTS_DEBU -Xcompiler -fPIC --std=c++20 -o libqwen2_fp16.so -O3 src/models/qwen2/qwen2.cu -I./ -lm -lcublas -lcublasLt  -gencode arch=compute_80,code=sm_80 
 	rm -rf $(LD_QWEN2_LIB_PATH)/libqwen2_fp16.so
 	mv libqwen2_fp16.so $(LD_QWEN2_LIB_PATH)/libqwen2_fp16.so
 
 qwen2_cpp: src/models/qwen2/qwen2.cpp
 	mkdir -p $(LD_QWEN2_LIB_PATH)
-	g++ --shared -DLINEAR_DEBU -D ARGMAX_DEBU -fPIC --std=c++20 -o libqwen2_fp32.so -Ofast src/models/qwen2/qwen2.cpp -I./ -lm -fopenmp
+	g++ --shared -DLINEAR_DEBU -fPIC --std=c++20 -o libqwen2_fp32.so -Ofast src/models/qwen2/qwen2.cpp -I./ -lm -fopenmp
 	rm -rf $(LD_QWEN2_LIB_PATH)/libqwen2_fp32.so
 	mv libqwen2_fp32.so $(LD_QWEN2_LIB_PATH)/libqwen2_fp32.so
 
 qwen2_avx512: src/models/qwen2/qwen2.cpp
 	mkdir -p $(LD_QWEN2_LIB_PATH)
-	g++ --shared -DAVX512_FWD -D ARGMAX_DEBU -fPIC --std=c++20 -o libqwen2_fp32.so -Ofast src/models/qwen2/qwen2.cpp -I./ -lm -fopenmp -mavx512f
+	g++ --shared -DAVX512_FWD -fPIC --std=c++20 -o libqwen2_fp32.so -Ofast src/models/qwen2/qwen2.cpp -I./ -lm -fopenmp -mavx512f
 	rm -rf $(LD_QWEN2_LIB_PATH)/libqwen2_fp32.so
 	mv libqwen2_fp32.so $(LD_QWEN2_LIB_PATH)/libqwen2_fp32.so
 	
 qwen2_neon: src/models/qwen2/qwen2.cpp
 	mkdir -p $(LD_QWEN2_LIB_PATH)
-	g++ --shared -DNEON_FWD -D ARGMAX_DEBU -fPIC --std=c++20 -o libqwen2_fp32.so -O3 src/models/qwen2/qwen2.cpp -I./ -lm -fopenmp
+	g++ --shared -DNEON_FWD -fPIC --std=c++20 -o libqwen2_fp32.so -O3 src/models/qwen2/qwen2.cpp -I./ -lm -fopenmp
 	rm -rf $(LD_QWEN2_LIB_PATH)/libqwen2_fp32.so
 	mv libqwen2_fp32.so $(LD_QWEN2_LIB_PATH)/libqwen2_fp32.so
 

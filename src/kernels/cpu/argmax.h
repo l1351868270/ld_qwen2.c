@@ -16,8 +16,7 @@ namespace cpu {
 namespace argmax {
 
 void argmaxV1_fwd(int* output, float* input, int batch, int dim) {
-    int b;
-    #pragma omp parallel for private(b)
+    #pragma omp parallel for
     for (int b = 0; b < batch; b++) {
         int max_i = 0;
         for (int d = 1; d < dim; d++) {
@@ -41,8 +40,7 @@ void argmaxV1_fwd(int* output, float* input, int batch, int dim) {
 
 #ifdef AVX512_FWD
 void argmax_avx512_fwd(int* output, float* input, int batch, int dim) {
-    int b;
-    #pragma omp parallel for private(b)
+    #pragma omp parallel for
     for (int b = 0; b < batch; b++) {
         int max_i = 0;
         for (int d = 1; d < dim; d += 16) {
@@ -70,8 +68,7 @@ void argmax_avx512_fwd(int* output, float* input, int batch, int dim) {
 
 #ifdef NEON_FWD
 void argmax_neon_fwd(int* output, float* input, int batch, int dim) {
-    int b;
-    #pragma omp parallel for private(b)
+    #pragma omp parallel for
     for (int b = 0; b < batch; b++) {
         int max_i = 0;
         for (int d = 1; d < dim; d += 4) {

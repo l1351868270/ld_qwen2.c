@@ -2,6 +2,7 @@
 
 
 #include "utils.h"
+#include <omp.h>
 
 #ifdef AVX512_FWD
 #include <immintrin.h>
@@ -18,12 +19,9 @@ namespace linear {
 // https://pytorch.org/docs/stable/generated/torch.nn.Linear.html
 void linearV1_fwd(float* output, float* input, float *weight, float* bias, int batch, int in_features, int out_features) {
     int elem_per_cpu = out_features / utils::NUM_CPUS;
-    // int b;
-    // #pragma omp parallel for private(b)
+    #pragma omp parallel for collapse(2)
     for (int b = 0; b < batch; b++) {
-        int t;
-        #pragma omp parallel for private(t)
-        for (t = 0; t < utils::NUM_CPUS; t++) {
+        for (int t = 0; t < utils::NUM_CPUS; t++) {
             for (int d = 0; d < elem_per_cpu; d++) {
                 int offset_out = b * out_features + t * elem_per_cpu + d;
                 int offset_bias = t * elem_per_cpu + d;
@@ -55,12 +53,9 @@ void linearV1_fwd(float* output, float* input, float *weight, float* bias, int b
 }
 
 void linearV2_fwd(float* output, float* input, float *weight, float* bias, int batch, int in_features, int out_features) {
-    // int b;
-    // #pragma omp parallel for private(b)
+    #pragma omp parallel  for collapse(2) schedule(dynamic)
     for (int b = 0; b < batch; b++) {
-        int d;
-        #pragma omp parallel for private(d)
-        for (d = 0; d < out_features; d++) {
+        for (int d = 0; d < out_features; d++) {
             int offset_out = b * out_features + d;
             int offset_bias = d;
             float value = 0.0f;
@@ -92,12 +87,9 @@ void linearV2_fwd(float* output, float* input, float *weight, float* bias, int b
 
 #ifdef AVX512_FWD
 void linear_avx512_fwd(float* output, float* input, float *weight, float* bias, int batch, int in_features, int out_features) {
-    // int b;
-    // #pragma omp parallel for private(b)
+    #pragma omp parallel for collapse(2)
     for (int b = 0; b < batch; b++) {
-        int d;
-        #pragma omp parallel for private(d)
-        for (d = 0; d < out_features; d++) {
+        for (int d = 0; d < out_features; d++) {
             int offset_out = b * out_features + d;
             int offset_bias = d;
             float value = 0.0f;
@@ -136,12 +128,9 @@ void linear_avx512_fwd(float* output, float* input, float *weight, float* bias, 
 
 #ifdef NEON_FWD
 void linear_neon_fwd(float* output, float* input, float *weight, float* bias, int batch, int in_features, int out_features) {
-    // int b;
-    // #pragma omp parallel for private(b)
+    #pragma omp parallel for collapse(2)
     for (int b = 0; b < batch; b++) {
-        int d;
-        #pragma omp parallel for private(d)
-        for (d = 0; d < out_features; d++) {
+        for (int d = 0; d < out_features; d++) {
                 int offset_out = b * out_features + d;
                 int offset_bias = d;
                 float value = 0.0f;
@@ -189,7 +178,12 @@ void linear_fwd(float* output, float* input, float *weight, float* bias, int bat
 #elif OPENMP_V1
     linearV1_fwd(output, input, weight, bias, batch, in_features, out_features);
 #else
+    // double tdata = omp_get_wtime();
     linearV2_fwd(output, input, weight, bias, batch, in_features, out_features);
+    // tdata = omp_get_wtime() - tdata;
+    // if (out_features==151936) {
+    //     printf("batch=%d, in_features=%d, out_features=%d,  in %f secs\n", batch, in_features, out_features, tdata);
+    // }
 #endif
 }
 

@@ -18,12 +18,9 @@ namespace silu {
 // https://pytorch.org/docs/stable/generated/torch.nn.SiLU.html
 void siluV1_fwd(float *hb, float* hb2, int batch, int dim) {
     int elem_per_cpu = dim / utils::NUM_CPUS;
-    // int b;
-    // #pragma omp parallel for private(b)
+    #pragma omp parallel for collapse(2)
     for (int b = 0; b < batch; b++) {
-        int t;
-        #pragma omp parallel for private(t)
-        for (t = 0; t < utils::NUM_CPUS; t++) {
+        for (int t = 0; t < utils::NUM_CPUS; t++) {
             for (int i = 0; i < elem_per_cpu; i++) {
                 int offset = b * dim + t * elem_per_cpu + i;
                 float val = hb[offset];
@@ -48,12 +45,9 @@ void siluV1_fwd(float *hb, float* hb2, int batch, int dim) {
 }
 
 void siluV2_fwd(float *hb, float* hb2, int batch, int dim) {
-    // int b;
-    // #pragma omp parallel for private(b)
+    #pragma omp parallel for collapse(2)
     for (int b = 0; b < batch; b++) {
-        int d;
-        #pragma omp parallel for private(d)
-        for (d = 0; d < dim; d++) {
+        for (int d = 0; d < dim; d++) {
             int offset = b * dim + d;
             float val = hb[offset];
             val *= 1.0f / (1.0f + expf(-val));
@@ -77,12 +71,9 @@ void siluV2_fwd(float *hb, float* hb2, int batch, int dim) {
 
 #ifdef AVX512_FWD
 void silu_avx512_fwd(float *hb, float* hb2, int batch, int dim) {
-    // int b;
-    // #pragma omp parallel for private(b)
+    #pragma omp parallel for collapse(2)
     for (int b = 0; b < batch; b++) {
-        int d;
-        #pragma omp parallel for private(d)
-        for (d = 0; d < dim; d += 16) {
+        for (int d = 0; d < dim; d += 16) {
             int offset = b * dim + d;
             __m512 val_avx = _mm512_loadu_ps(hb + offset);
             for(int i = 0; i < 16; i++) {
@@ -108,12 +99,9 @@ void silu_avx512_fwd(float *hb, float* hb2, int batch, int dim) {
 
 #ifdef NEON_FWD
 void silu_neon_fwd(float *hb, float* hb2, int batch, int dim) {
-    // int b;
-    // #pragma omp parallel for private(b)
+    #pragma omp parallel for collapse(2)
     for (int b = 0; b < batch; b++) {
-        int d;
-        #pragma omp parallel for private(d)
-        for (d = 0; d < dim; d += 4) {
+        for (int d = 0; d < dim; d += 4) {
             int offset = b * dim + d;
             float32x4_t val_neon = vld1q_f32(hb + offset);
             for(int i = 0; i < 4; i++) {

@@ -18,7 +18,7 @@ python tools/export.py --filepath="qwen1.5-0.5B-fp16.bin" --dtype="fp16" --model
 
 make clean
 
-make single_W16A16
+make single_W16A16 或者 make qwen2
 
 python tools/run.py -p "天空为什么是蓝色的" -m "Qwen/Qwen1.5-0.5B-Chat" -q fp16 --batch 1
 
