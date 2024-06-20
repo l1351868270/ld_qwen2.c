@@ -21,6 +21,10 @@ python run.py --model_type=Qwen/Qwen1.5-0.5B-Chat -q=fp32 --batch=1 --prompt="å¤
 #include "./src/kernels/cpu/silu.h"
 #include "./src/kernels/cpu/argmax.h"
 
+#ifdef ENABLE_MPI
+include "mpi.h"
+#endif
+
 extern "C" {
     void c_init(int batch, int max_seq_len, const char *checkpoint_path);
     int* c_qwen2_forward(int batch, int seq_len, int *data, int pos);
@@ -395,6 +399,9 @@ void* qwen2_forward(Context *ctx, Qwen2* qwen2, int *token, int batch, int pos) 
 Qwen2 py_model;
 
 void c_init(int batch, int max_seq_len, const char *checkpoint_path) {
+#ifdef ENABLE_MPI
+    MPI_Init(NULL, NULL);
+#endif
     printf("checkpoint_path: %s\n", checkpoint_path);
     if (checkpoint_path == NULL) {
         checkpoint_path = "qwen1.5-0.5B.bin";
