@@ -14,7 +14,8 @@ namespace ld_infer {
 namespace cpu {
 namespace residual {
 
-void residualV1_fwd(float *x, float *xb, int batch, int dim) {
+template <typename T>
+void residualV1_fwd(T *x, T *xb, int batch, int dim) {
     int elem_per_cpu = dim / utils::NUM_CPUS;
     #pragma omp parallel for collapse(2)
     for (int b = 0; b < batch; b++) {
@@ -40,7 +41,8 @@ void residualV1_fwd(float *x, float *xb, int batch, int dim) {
 
 }
 
-void residualV2_fwd(float *x, float *xb, int batch, int dim) {
+template <typename T>
+void residualV2_fwd(T *x, T *xb, int batch, int dim) {
     #pragma omp parallel for collapse(2)
     for (int b = 0; b < batch; b++) {
         for (int d = 0; d < dim; d++) {
@@ -112,7 +114,8 @@ void residual_neon_fwd(float *x, float *xb, int batch, int dim) {
 }
 #endif
 
-void residual_fwd(float *x, float *xb, int batch, int dim) {
+template <typename T>
+void residual_fwd(T *x, T *xb, int batch, int dim) {
 #ifdef AVX512_FWD
     residual_avx512_fwd(x, xb, batch, dim);
 #elif NEON_FWD

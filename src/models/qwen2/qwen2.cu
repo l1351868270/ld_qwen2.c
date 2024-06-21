@@ -24,8 +24,8 @@ python run.py --model_type=Qwen/Qwen1.5-0.5B-Chat --prompt="天空为什么是�
 #include "./src/kernels/cuda/silu_half.cuh"
 #include "./src/kernels/cuda/argmax_half.cuh"
 
-// #ifdef ENABLE_MPI
-#include <mpi.h>
+// #ifdef ENABLE_MUTI
+// #include <mpi.h>
 // #endif
 
 extern "C" {

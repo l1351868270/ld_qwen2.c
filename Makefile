@@ -23,9 +23,9 @@ qwen2_cpp: src/models/qwen2/qwen2.cpp
 	rm -rf $(LD_QWEN2_LIB_PATH)/libqwen2_fp32.so
 	mv libqwen2_fp32.so $(LD_QWEN2_LIB_PATH)/libqwen2_fp32.so
 
-qwen2_mpi: src/models/qwen2/qwen2.cpp
+qwen2_mpi: src/models/qwen2/qwen2_mpi.cpp
 	mkdir -p $(LD_QWEN2_LIB_PATH)
-	mpicxx -DENABLE_MPI --shared -fPIC --std=c++20 -o libqwen2_fp32.so -Ofast src/models/qwen2/qwen2.cpp -I./ -lm -fopenmp -lmpi
+	mpicxx -DENABLE_MUTI --shared -fPIC --std=c++20 -o libqwen2_fp32.so -Ofast src/models/qwen2/qwen2_mpi.cpp -I./ -lm -fopenmp -lmpi
 	rm -rf $(LD_QWEN2_LIB_PATH)/libqwen2_fp32.so
 	mv libqwen2_fp32.so $(LD_QWEN2_LIB_PATH)/libqwen2_fp32.so
 

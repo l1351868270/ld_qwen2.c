@@ -17,7 +17,8 @@ namespace cpu {
 namespace linear {
 
 // https://pytorch.org/docs/stable/generated/torch.nn.Linear.html
-void linearV1_fwd(float* output, float* input, float *weight, float* bias, int batch, int in_features, int out_features) {
+template <typename TS, typename TW>
+void linearV1_fwd(TS* output, TS* input, TW *weight, TW* bias, int batch, int in_features, int out_features) {
     int elem_per_cpu = out_features / utils::NUM_CPUS;
     #pragma omp parallel for collapse(2)
     for (int b = 0; b < batch; b++) {
@@ -52,7 +53,8 @@ void linearV1_fwd(float* output, float* input, float *weight, float* bias, int b
 #endif
 }
 
-void linearV2_fwd(float* output, float* input, float *weight, float* bias, int batch, int in_features, int out_features) {
+template <typename TS, typename TW>
+void linearV2_fwd(TS* output, TS* input, TW *weight, TW* bias, int batch, int in_features, int out_features) {
     #pragma omp parallel  for collapse(2) schedule(dynamic)
     for (int b = 0; b < batch; b++) {
         for (int d = 0; d < out_features; d++) {
@@ -170,7 +172,8 @@ void linear_neon_fwd(float* output, float* input, float *weight, float* bias, in
 
 #endif
 
-void linear_fwd(float* output, float* input, float *weight, float* bias, int batch, int in_features, int out_features) {
+template <typename TS, typename TW>
+void linear_fwd(TS* output, TS* input, TW *weight, TW* bias, int batch, int in_features, int out_features) {
 #ifdef AVX512_FWD
     linear_avx512_fwd(output, input, weight, bias, batch, in_features, out_features);
 #elif NEON_FWD

@@ -15,8 +15,9 @@
 namespace ld_infer {
 namespace cpu {
 namespace group_attention {
-    
-void group_attention_v1_fwd(float* output, float *q, float *key_cache, float *value_cache, float *att,
+
+template <typename T> 
+void group_attention_v1_fwd(T* output, T *q, T *key_cache, T *value_cache, T *att,
                              int batch, int q_heads, int k_heads, int head_dim, int max_q_heads, int max_kv_heads, int max_seq_len, 
                              int num_transformer_layers, int layer_idx, int pos) {
     int num_groups = q_heads / k_heads;
@@ -273,7 +274,8 @@ void group_attention_neon_fwd(float* output, float *q, float *key_cache, float *
 }
 #endif
 
-void group_attention_fwd(float* output, float *q, float *key_cache, float *value_cache, float *att,
+template <typename T>
+void group_attention_fwd(T* output, T *q, T *key_cache, T *value_cache, T *att,
                              int batch, int q_heads, int k_heads, int head_dim, int max_q_heads, int max_kv_heads, int max_seq_len, 
                              int num_transformer_layers, int layer_idx, int pos) {
 #ifdef AVX512_FWD

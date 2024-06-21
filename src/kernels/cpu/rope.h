@@ -16,7 +16,8 @@ namespace ld_infer {
 namespace cpu {
 namespace rope {
 
-void ropeV1_fwd(float *q, float rope_freq_constant, int batch, int num_heads, int head_dim, int pos) {
+template <typename T>
+void ropeV1_fwd(T *q, float rope_freq_constant, int batch, int num_heads, int head_dim, int pos) {
 
     int elem_per_cpu = head_dim / 2 / utils::NUM_CPUS;
     // int b;
@@ -64,7 +65,8 @@ void ropeV1_fwd(float *q, float rope_freq_constant, int batch, int num_heads, in
 
 }
 
-void ropeV2_fwd(float *q, float rope_freq_constant, int batch, int num_heads, int head_dim, int pos) {
+template <typename T>
+void ropeV2_fwd(T *q, float rope_freq_constant, int batch, int num_heads, int head_dim, int pos) {
     #pragma omp parallel for collapse(2) schedule(dynamic)
     for (int b = 0; b < batch; b++) {
         // #pragma omp parallel for
@@ -192,8 +194,8 @@ void rope_neon_fwd(float *q, float rope_freq_constant, int batch, int num_heads,
 }
 #endif
 
-
-void rope_fwd(float *q, float rope_freq_constant, int batch, int num_heads, int head_dim, int pos) {
+template <typename T>
+void rope_fwd(T *q, float rope_freq_constant, int batch, int num_heads, int head_dim, int pos) {
 #ifdef AVX512_FWD
     rope_avx512_fwd(q, rope_freq_constant, batch, num_heads, head_dim, pos);
 #elif NEON_FWD

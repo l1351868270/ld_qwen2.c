@@ -3,6 +3,7 @@
 #include <stdint.h>
 #include <math.h>
 #include "utils.h"
+#include <omp.h>
 
 #ifdef AVX512_FWD
 #include <immintrin.h>
@@ -17,7 +18,8 @@ namespace cpu {
 namespace rmsnorm {
 
 // https://arxiv.org/pdf/1910.07467
-void rmsnormV1_fwd(float* o, float* x, float *weight, float rms_norm_eps, int batch, int dim) {
+template <typename TS, typename TW>
+void rmsnormV1_fwd(TS* o, TS* x, TW *weight, float rms_norm_eps, int batch, int dim) {
     // int b;
     // #pragma omp parallel for private(b)
     for (int b = 0; b < batch; b++) {
@@ -58,13 +60,15 @@ void rmsnormV1_fwd(float* o, float* x, float *weight, float rms_norm_eps, int ba
 
 }
 
-void rmsnormV2_fwd(float* o, float* x, float *weight, float rms_norm_eps, int batch, int dim) {
+template <typename TS, typename TW>
+void rmsnormV2_fwd(TS* o, TS* x, TW *weight, float rms_norm_eps, int batch, int dim) {
     // int b;
     // #pragma omp parallel for private(b)
     for (int b = 0; b < batch; b++) {
             
         int offset = b * dim;
         float ss = 0.0f;
+        #pragma omp parallel for reduction(+:ss)
         for (int d = 0; d < dim; d++) {
             ss += x[offset + d] * x[ offset + d];
         }
@@ -72,9 +76,8 @@ void rmsnormV2_fwd(float* o, float* x, float *weight, float rms_norm_eps, int ba
         ss += rms_norm_eps;
         ss = 1.0f / sqrtf(ss);
         
-        int d;
-        #pragma omp parallel for private(d)
-        for (d = 0; d < dim; d++) {
+        #pragma omp parallel for
+        for (int d = 0; d < dim; d++) {
             int offset_o = b * dim + d;
             int offset_w = d;
             o[offset_o] = x[offset_o] * ss * weight[offset_w];
@@ -184,7 +187,8 @@ void rmsnorm_neon_fwd(float* o, float* x, float *weight, float rms_norm_eps, int
 }
 #endif
 
-void rmsnorm_fwd(float* o, float* x, float *weight, float rms_norm_eps, int batch, int dim) {
+template <typename TS, typename TW>
+void rmsnorm_fwd(TS* o, TS* x, TW *weight, float rms_norm_eps, int batch, int dim) {
 #ifdef AVX512_FWD
     rmsnorm_avx512_fwd(o, x, weight, rms_norm_eps, batch, dim);
 #elif NEON_FWD
@@ -192,7 +196,11 @@ void rmsnorm_fwd(float* o, float* x, float *weight, float rms_norm_eps, int batc
 #elif OPENMP_V1
     rmsnormV1_fwd(o, x, weight, rms_norm_eps, batch, dim);
 #else
+    // double tdata = omp_get_wtime();
     rmsnormV2_fwd(o, x, weight, rms_norm_eps, batch, dim);
+    // tdata = omp_get_wtime() - tdata;
+    // printf("batch=%d, dim=%d, in %f secs\n", batch, dim, tdata);
+
 #endif
 }
 

@@ -59,6 +59,10 @@ W4A16
 ## batch
 naive batch / static batch
 
+# Doing
+
+模型并行: Tensor并行
+
 # TODO
 ## kv cache
 

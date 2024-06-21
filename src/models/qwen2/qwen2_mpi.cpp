@@ -369,7 +369,6 @@ void c_init(int batch, int max_seq_len, const char *checkpoint_path, const char 
         checkpoint_path = "qwen1.5-0.5B.bin";
     }
 
-    
     if (std::strcmp(ts, "fp32") == 0) {
         if (std::strcmp(tw, "fp32") == 0) {
             auto *model = c_get_model<float, float>();
@@ -426,11 +425,4 @@ int* c_qwen2_forward(int batch, int seq_len, int *data, int pos, const char *ts 
     }
 
     return NULL;
-}
-
-
-int main(int argc, char **argv) {
-    for (int i = 0; i < argc; i++) {
-        printf("argv[%d]: %s\n", i, argv[i]);
-    }
 }

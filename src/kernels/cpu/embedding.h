@@ -2,6 +2,7 @@
 
 #include <concepts>
 #include "utils.h"
+#include <math.h>
 #ifdef AVX512_FWD
 #include <immintrin.h>
 #endif
@@ -14,8 +15,10 @@ namespace ld_infer {
 namespace cpu {
 namespace embedding {
 
-template <typename T>
-void embeddingV1_fwd(T *x, T* embed_tokens, int *token, int batch, int dim) {
+template<typename T>
+concept all = std::is_same_v<typename T::identifier, float>;
+template <typename TS, typename TW>
+void embeddingV1_fwd(TS *x, TW* embed_tokens, int *token, int batch, int dim) {
     int elem_per_cpu = dim / utils::NUM_CPUS;
     #pragma omp parallel for collapse(2)
     for (int b = 0; b < batch; b++) {
@@ -43,8 +46,8 @@ void embeddingV1_fwd(T *x, T* embed_tokens, int *token, int batch, int dim) {
 
 }
 
-template <typename T>
-void embeddingV2_fwd(T *x, T* embed_tokens, int *token, int batch, int dim) {
+template <typename TS, typename TW>
+void embeddingV2_fwd(TS *x, TW* embed_tokens, int *token, int batch, int dim) {
     #pragma omp parallel for collapse(2)
     for (int b = 0; b < batch; b++) {
         for (int d = 0; d < dim; d++) {
@@ -70,8 +73,8 @@ void embeddingV2_fwd(T *x, T* embed_tokens, int *token, int batch, int dim) {
 }
 
 #ifdef AVX512_FWD
-template <typename T>
-void embedding_avx512_fwd(T *x, T* embed_tokens, int *token, int batch, int dim) {
+template <typename TS, typename TW>
+void embedding_avx512_fwd(TS *x, TW* embed_tokens, int *token, int batch, int dim) {
     #pragma omp parallel for collapse(2)
     for (int b = 0; b < batch; b++) {
         for (int d = 0; d < dim; d += 16) {
@@ -98,8 +101,8 @@ void embedding_avx512_fwd(T *x, T* embed_tokens, int *token, int batch, int dim)
 #endif
 
 #ifdef NEON_FWD
-template <typename T>
-void embedding_neon_fwd(T *x, T* embed_tokens, int *token, int batch, int dim) {
+template <typename TS, typename TW>
+void embedding_neon_fwd(TS *x, TW* embed_tokens, int *token, int batch, int dim) {
     #pragma omp parallel for collapse(2)
     for (int b = 0; b < batch; b++) {
         for (int d = 0; d < dim; d += 4) {
@@ -126,16 +129,47 @@ void embedding_neon_fwd(T *x, T* embed_tokens, int *token, int batch, int dim) {
 }
 #endif
 
-template <typename T>
-void embedding_fwd(T *x, T* embed_tokens, int *token, int batch, int dim) {
+#ifdef ENABLE_MUTI
+template <typename TS, typename TW>
+void embedding_muti_fwd(TS *x, TW* embed_tokens, int *token, int batch, int dim, int partial_rank = 0, int partial_size = 1) {
+    int elem_per_partial = dim / partial_size;
+    #pragma omp parallel for collapse(2)
+    for (int b = 0; b < batch; b++) {
+        for (int d = 0; d < elem_per_partial; d++) {
+            int offset_x = b * elem_per_partial + d;
+            int offset_t = token[b] * dim + partial_rank * elem_per_partial + d;
+            x[offset_x] = *(embed_tokens + offset_t);
+        }
+    }
+
+#ifdef EMBEDDING_DEBUG
+    printf("token[b]:%d \n", token[0]);
+    printf("[");
+    for (int b = 0; b < batch; b++) {
+        int offset_x = b * dim;
+        printf("[");
+        for (int i = 0; i < dim; i++) {
+            printf("%f, ", x[offset_x + i]);
+        }
+        printf("],\n");
+    }
+    printf("]\n");
+#endif // EMBEDDING_DEBUG
+}
+#endif
+
+template <typename TS, typename TW>
+void embedding_fwd(TS *x, TW* embed_tokens, int *token, int batch, int dim) {
 #ifdef AVX512_FWD
-    embedding_avx512_fwd(x, embed_tokens, token, batch, dim);
+    embedding_avx512_fwd<TS, TW>(x, embed_tokens, token, batch, dim);
 #elif NEON_FWD
-    embedding_neon_fwd(x, embed_tokens, token, batch, dim);
+    embedding_neon_fwd<TS, TW>(x, embed_tokens, token, batch, dim);
 #elif OPENMP_V1
-    embeddingV1_fwd(x, embed_tokens, token, batch, dim);
+    embeddingV1_fwd<TS, TW>(x, embed_tokens, token, batch, dim);
+#elif OPENMP_V1
+    embeddingV1_fwd<TS, TW>(x, embed_tokens, token, batch, dim);
 #else
-    embeddingV2_fwd(x, embed_tokens, token, batch, dim);
+    embeddingV2_fwd<TS, TW>(x, embed_tokens, token, batch, dim);
 #endif
 }
 } // namespace embedding

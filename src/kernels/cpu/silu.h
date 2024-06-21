@@ -16,7 +16,8 @@ namespace cpu {
 namespace silu {
 
 // https://pytorch.org/docs/stable/generated/torch.nn.SiLU.html
-void siluV1_fwd(float *hb, float* hb2, int batch, int dim) {
+template <typename T>
+void siluV1_fwd(T *hb, T* hb2, int batch, int dim) {
     int elem_per_cpu = dim / utils::NUM_CPUS;
     #pragma omp parallel for collapse(2)
     for (int b = 0; b < batch; b++) {
@@ -44,7 +45,8 @@ void siluV1_fwd(float *hb, float* hb2, int batch, int dim) {
 
 }
 
-void siluV2_fwd(float *hb, float* hb2, int batch, int dim) {
+template <typename T>
+void siluV2_fwd(T *hb, T* hb2, int batch, int dim) {
     #pragma omp parallel for collapse(2)
     for (int b = 0; b < batch; b++) {
         for (int d = 0; d < dim; d++) {
@@ -125,7 +127,8 @@ void silu_neon_fwd(float *hb, float* hb2, int batch, int dim) {
 }
 #endif
 
-void silu_fwd(float *hb, float* hb2, int batch, int dim) {
+template <typename T>
+void silu_fwd(T *hb, T* hb2, int batch, int dim) {
 #ifdef AVX512_FWD
     silu_avx512_fwd(hb, hb2, batch, dim);
 #elif NEON_FWD

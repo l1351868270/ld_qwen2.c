@@ -26,7 +26,11 @@ class CLDQwen2:
 
         if quantization_type == "fp32":
             self.qwen2lib = CDLL(os.path.join(self.qwen2_path, "lib", "libqwen2_fp32.so"))
+            self.ts = "fp32"
+            self.tw = "fp32"
         if quantization_type == "fp16":
+            self.ts = "fp16"
+            self.tw = "fp16"
             self.qwen2lib = CDLL(os.path.join(self.qwen2_path, "lib", "libqwen2_fp16.so"))
         if quantization_type == "q80":
             self.qwen2lib = CDLL(os.path.join(self.qwen2_path, "lib", "libqwen2_q80.so"))
@@ -91,13 +95,17 @@ class CLDQwen2:
         self.stop_token_ids = [self.tokenizer.eos_token_id]
     
     def init(self):
-        self.qwen2lib.c_init.argtypes = [c_int, c_int, c_char_p]
+        self.qwen2lib.c_init.argtypes = [c_int, c_int, c_char_p, c_char_p, c_char_p]
         checkpoint_path_buffer = create_string_buffer(self.checkpoint_path.encode("utf-8"))
-        self.qwen2lib.c_init(c_int(self.batch), c_int(self.max_seq_len), checkpoint_path_buffer)
+        ts_buffer = create_string_buffer(self.ts.encode("utf-8"))
+        tw_buffer = create_string_buffer(self.tw.encode("utf-8"))
+        self.qwen2lib.c_init(c_int(self.batch), c_int(self.max_seq_len), checkpoint_path_buffer, ts_buffer, tw_buffer)
     
     def qwen2_forward(self, token, seq_len, pos)->list:
         self.qwen2lib.c_qwen2_forward.restype = POINTER(c_int * self.batch)
-        sample = self.qwen2lib.c_qwen2_forward(c_int(self.batch), c_int(seq_len), (c_int * len(token))(*token), c_int(pos)) 
+        ts_buffer = create_string_buffer(self.ts.encode("utf-8"))
+        tw_buffer = create_string_buffer(self.tw.encode("utf-8"))
+        sample = self.qwen2lib.c_qwen2_forward(c_int(self.batch), c_int(seq_len), (c_int * len(token))(*token), c_int(pos), ts_buffer, tw_buffer) 
         res = []
         for i in sample.contents:
             res.append(int(i))
